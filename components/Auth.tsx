@@ -1,0 +1,219 @@
+import React, { useState } from 'react';
+import { db } from '../lib/mockFirebase';
+import { User } from '../types';
+import { Volleyball, AlertCircle, ShieldCheck, Code, User as UserIcon } from 'lucide-react';
+
+interface AuthProps {
+  onSuccess: (user: User) => void;
+}
+
+export default function Auth({ onSuccess }: AuthProps) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Login State
+  const [email, setEmail] = useState("");
+  const [dobPassword, setDobPassword] = useState("");
+
+  // Register State
+  const [regData, setRegData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    dob: '',
+    gender: 'M' as 'M'|'F'|'O'
+  });
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const user = await db.login(email, dobPassword);
+      onSuccess(user);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async (roleEmail: string, rolePass: string) => {
+    setError("");
+    setLoading(true);
+    try {
+        const user = await db.login(roleEmail, rolePass);
+        onSuccess(user);
+    } catch (err: any) {
+        setError("Login Demo falhou: " + err.message);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    
+    // Validate DOB format strict
+    if (!/^\d{8}$/.test(regData.dob)) {
+      setError("Data de nascimento deve ter exatamente 8 dígitos (ddmmaaaa)");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const user = await db.register(regData);
+      onSuccess(user);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-900 text-white min-h-screen">
+      <div className="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
+        
+        {/* Header */}
+        <div className="bg-blue-600 p-6 flex flex-col items-center">
+          <div className="bg-white p-3 rounded-full shadow-lg mb-3">
+            <Volleyball size={32} className="text-blue-600" />
+          </div>
+          <h1 className="text-2xl font-bold">Gestor VolleyGroup</h1>
+          <p className="text-blue-100 text-sm">Hub Profissional do Time</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-slate-700">
+          <button 
+            onClick={() => setIsLogin(true)}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${isLogin ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+          >
+            Entrar
+          </button>
+          <button 
+            onClick={() => setIsLogin(false)}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLogin ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+          >
+            Cadastrar
+          </button>
+        </div>
+
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/40 border border-red-700 text-red-200 rounded-lg text-sm flex items-center gap-2">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+
+          {isLogin ? (
+            <>
+                <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
+                    <input required type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="voce@exemplo.com" />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Senha (Nasc: ddmmaaaa)</label>
+                    <input required type="password" maxLength={8} value={dobPassword} onChange={e => setDobPassword(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="01012000" />
+                </div>
+                <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-2 transition-all active:scale-[0.98]">
+                    {loading ? 'Autenticando...' : 'Acessar Painel'}
+                </button>
+                </form>
+
+                {/* Quick Logins */}
+                <div className="mt-8 pt-6 border-t border-slate-700">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold text-center mb-3 tracking-wider">Modo de Teste Rápido</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button 
+                            type="button"
+                            onClick={() => handleQuickLogin('dev@volley.com', '01012000')}
+                            className="flex flex-col items-center justify-center p-2 bg-indigo-900/30 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800 rounded-lg transition-colors group"
+                        >
+                            <Code size={16} className="mb-1 group-hover:text-white"/>
+                            <span className="text-[10px] font-bold">DEV</span>
+                        </button>
+
+                        <button 
+                            type="button"
+                            onClick={() => handleQuickLogin('admin@volley.com', '01012000')}
+                            className="flex flex-col items-center justify-center p-2 bg-purple-900/30 hover:bg-purple-900/60 text-purple-300 border border-purple-800 rounded-lg transition-colors group"
+                        >
+                            <ShieldCheck size={16} className="mb-1 group-hover:text-white"/>
+                            <span className="text-[10px] font-bold">ADMIN</span>
+                        </button>
+
+                         <button 
+                            type="button"
+                            onClick={() => handleQuickLogin('ana@volley.com', '11111111')}
+                            className="flex flex-col items-center justify-center p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-lg transition-colors group"
+                        >
+                            <UserIcon size={16} className="mb-1 group-hover:text-white"/>
+                            <span className="text-[10px] font-bold">USER</span>
+                        </button>
+                    </div>
+                </div>
+            </>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-3">
+              
+              {/* Row 1: Nome Completo */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Nome Completo</label>
+                <input required type="text" placeholder="Seu nome completo" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              
+              {/* Row 2: Telefone */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Celular / WhatsApp</label>
+                <input required type="tel" maxLength={15} placeholder="(99) 99999-9999" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+
+              {/* Row 3: Email */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
+                <input required type="email" placeholder="seu@email.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              
+              {/* Row 4: Nascimento e Gênero */}
+              <div className="grid grid-cols-2 gap-3">
+                 <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Nascimento</label>
+                    <input required type="text" maxLength={8} placeholder="ddmmaaaa" value={regData.dob} onChange={e => setRegData({...regData, dob: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                 </div>
+                 
+                 <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Gênero</label>
+                    <select value={regData.gender} onChange={e => setRegData({...regData, gender: e.target.value as any})}
+                       className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="M">Masculino</option>
+                        <option value="F">Feminino</option>
+                        <option value="O">Outro</option>
+                     </select>
+                 </div>
+              </div>
+              
+              <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento (ddmmaaaa) será sua senha.</p>
+              
+              <button disabled={loading} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98]">
+                {loading ? 'Criando...' : 'Criar Conta'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

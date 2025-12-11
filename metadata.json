@@ -1,0 +1,5 @@
+{
+  "name": "Gestor VolleyGroup",
+  "description": "Gestão profissional de times de vôlei com controle de acesso, financeiro e lista de espera.",
+  "requestFramePermissions": []
+}
