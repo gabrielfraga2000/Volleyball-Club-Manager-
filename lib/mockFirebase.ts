@@ -210,6 +210,22 @@ export const db = {
           users[idx].role = newRole;
           localStorage.setItem(KEY_USERS, JSON.stringify(users));
           this.addLog("ROLE_CHANGE", `Usuário ${users[idx].fullName} alterado de ${oldRole} para ${newRole}`, "Sistema");
+
+          // NEW NOTIFICATION LOGIC FOR ROLE CHANGE
+          let notifMsg = "";
+          if (newRole === 1 && oldRole === 0) {
+              notifMsg = "🎉 Sua conta foi aprovada! Agora você pode entrar nos jogos.";
+          } else if (newRole === 2) {
+              notifMsg = "🛡️ Você foi promovido a Ademiro! Acesse o painel pelo seu perfil.";
+          } else if (newRole === 0) {
+              notifMsg = "⚠️ Sua conta voltou para status pendente.";
+          } else {
+              notifMsg = `Seu nível de acesso foi alterado para ${newRole}.`;
+          }
+          
+          if (notifMsg) {
+              this.addNotification(uid, notifMsg);
+          }
       }
   },
 
@@ -274,6 +290,33 @@ export const db = {
         // Only notify if it was automatic due to full/late (not implicit choice? UI handles implicit)
     } else {
         session.players.push(listPlayer);
+
+        // --- PROGRESS NOTIFICATION LOGIC ---
+        const count = session.players.length;
+        const max = session.maxSpots;
+        
+        let progressMsg = "";
+        // Check exact thresholds to avoid spamming
+        if (count === Math.ceil(max * 0.5)) {
+            progressMsg = `A lista ${session.name} chegou a 50% de lotação!`;
+        } else if (count === Math.ceil(max * 0.75)) {
+             progressMsg = `A lista ${session.name} chegou a 75% de lotação!`;
+        } else if (count === max) {
+             progressMsg = `A lista ${session.name} lotou (100%)!`;
+        }
+
+        if (progressMsg) {
+            // Send to all UNIQUE users in the list
+            const uniqueUserIds = new Set<string>();
+            session.players.forEach(p => {
+                if (p.isGuest && p.linkedTo) uniqueUserIds.add(p.linkedTo);
+                else if (!p.isGuest) uniqueUserIds.add(p.userId);
+            });
+
+            uniqueUserIds.forEach(targetId => {
+                this.addNotification(targetId, progressMsg);
+            });
+        }
     }
 
     sessions[sessionIndex] = session;
@@ -322,9 +365,24 @@ export const db = {
     // 3. Promotion Logic
     // Check if spots opened up in the main player list
     let promotedCount = 0;
+    const startMinutes = getMinutes(session.time);
+
     while (session.players.length < session.maxSpots && session.waitlist.length > 0) {
-        // FIFO: Take the first person from waitlist
-        const candidate = session.waitlist.shift(); 
+        
+        // Find the first candidate who is NOT late (>30 min)
+        const candidateIndex = session.waitlist.findIndex(p => {
+            const arrMinutes = getMinutes(p.arrivalEstimate);
+            // Valid if arrival is <= start + 30
+            return arrMinutes <= (startMinutes + 30);
+        });
+        
+        // If no one is eligible (everyone left is late), stop promoting
+        if (candidateIndex === -1) {
+            break; 
+        }
+
+        // Remove the eligible candidate from waitlist
+        const [candidate] = session.waitlist.splice(candidateIndex, 1);
         
         if (candidate) {
             session.players.push(candidate);
@@ -360,6 +418,21 @@ export const db = {
   async deleteSession(sessionId: string) {
       await delay(300);
       let sessions = this.getSessions();
+      
+      // NEW NOTIFICATION LOGIC FOR DELETION
+      const sessionToDelete = sessions.find(s => s.id === sessionId);
+      if (sessionToDelete) {
+          const uniqueNotifyIds = new Set<string>();
+          [...sessionToDelete.players, ...sessionToDelete.waitlist].forEach(p => {
+              if (p.isGuest && p.linkedTo) uniqueNotifyIds.add(p.linkedTo);
+              else if (!p.isGuest) uniqueNotifyIds.add(p.userId);
+          });
+          
+          uniqueNotifyIds.forEach(uid => {
+             this.addNotification(uid, `⚠️ O jogo '${sessionToDelete.name}' (${sessionToDelete.date}) foi CANCELADO pelo Ademiro.`);
+          });
+      }
+
       sessions = sessions.filter(s => s.id !== sessionId);
       localStorage.setItem(KEY_SESSIONS, JSON.stringify(sessions));
       this.addLog("DELETE_SESSION", `Sessão ${sessionId} cancelada.`);

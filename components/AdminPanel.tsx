@@ -3,6 +3,49 @@ import { db } from '../lib/mockFirebase';
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
 import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 
+// --- TimePicker Component (Shared Logic) ---
+const TimePicker = ({ value, onChange, className = "" }: { value: string, onChange: (v: string) => void, className?: string }) => {
+    const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
+    const minutes = ['00', '10', '20', '30', '40', '50'];
+    
+    // Ensure value is HH:MM
+    const [h, m] = (value && value.includes(':')) ? value.split(':') : ['', ''];
+
+    const update = (newH: string, newM: string) => {
+        onChange(`${newH}:${newM}`);
+    };
+
+    const baseSelectClass = "appearance-none w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm text-slate-700 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 transition-colors";
+
+    return (
+        <div className={`flex items-center gap-1 ${className}`}>
+            <div className="relative flex-1">
+                <select 
+                    value={h} 
+                    onChange={e => update(e.target.value, m || '00')}
+                    className={baseSelectClass}
+                    required
+                >
+                    {!h && <option value="" disabled>Hr</option>}
+                    {hours.map(hh => <option key={hh} value={hh}>{hh}</option>)}
+                </select>
+            </div>
+            <span className="text-slate-400 font-bold">:</span>
+            <div className="relative flex-1">
+                <select 
+                    value={m} 
+                    onChange={e => update(h || '00', e.target.value)}
+                    className={baseSelectClass}
+                    required
+                >
+                    {!m && <option value="" disabled>Min</option>}
+                    {minutes.map(mm => <option key={mm} value={mm}>{mm}</option>)}
+                </select>
+            </div>
+        </div>
+    );
+};
+
 export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
@@ -53,6 +96,16 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
     if (newList.maxSpots < 6) {
       alert("O número mínimo de vagas para criar uma lista é 6.");
       return;
+    }
+
+    if (newList.maxSpots > 30) {
+      alert("O limite máximo de jogadores por lista é 30.");
+      return;
+    }
+    
+    if (!newList.time || !newList.guestTime) {
+        alert("Preencha todos os horários.");
+        return;
     }
     
     // Create timestamp from specific date and time inputs
@@ -143,22 +196,22 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
   return (
     <div className="space-y-6 mt-8 border-t border-slate-200 pt-8 relative">
-      <h2 className="text-lg font-bold text-purple-800 flex items-center gap-2">
-        Painel de Controle {isDev ? '(DEV)' : '(Admin)'}
+      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+        Painel do {isDev ? 'DEV' : 'ADEMIRO'}
       </h2>
 
       {/* Admin Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-purple-100 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         <button 
           onClick={() => setActiveSubTab('create')}
-          className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'create' ? 'bg-purple-600 text-white' : 'text-purple-600 bg-purple-50'}`}
+          className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'create' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
         >
           Criar Lista
         </button>
         
         <button 
            onClick={() => setActiveSubTab('users')}
-           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-purple-600 text-white' : 'text-purple-600 bg-purple-50'}`}
+           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
         >
           Jogadores
         </button>
@@ -167,7 +220,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         {isAdminOrDev && (
             <button 
             onClick={() => setActiveSubTab('matches')}
-            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'matches' ? 'bg-purple-600 text-white' : 'text-purple-600 bg-purple-50'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'matches' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
             >
             Partidas
             </button>
@@ -175,7 +228,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
         <button 
            onClick={() => setActiveSubTab('guests')}
-           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'guests' ? 'bg-purple-600 text-white' : 'text-purple-600 bg-purple-50'}`}
+           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'guests' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
         >
           Convidados
         </button>
@@ -183,7 +236,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         {isDev && (
             <button 
             onClick={() => { setActiveSubTab('logs'); refreshData(); }}
-            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'logs' ? 'bg-purple-600 text-white' : 'text-purple-600 bg-purple-50'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'logs' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
             >
             Logs / Auditoria
             </button>
@@ -192,39 +245,39 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       
       {/* Create List */}
       {activeSubTab === 'create' && (
-        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 animate-fade-in">
-          <h3 className="font-bold text-purple-900 mb-4">Nova Lista</h3>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-fade-in">
+          <h3 className="font-bold text-slate-900 mb-4">Nova Lista</h3>
           <form onSubmit={handleCreateList} className="space-y-3">
-            <input required placeholder="Local (ex: Ginásio Municipal)" className="w-full p-2 rounded text-sm" 
+            <input required placeholder="Local (ex: Ginásio Municipal)" className="w-full p-2 rounded text-sm border border-slate-200" 
               value={newList.name} onChange={e => setNewList({...newList, name: e.target.value})} />
             
-            <div className="bg-white p-2 rounded border border-purple-100">
-                <p className="text-xs font-bold text-purple-700 mb-1">Horário do Jogo</p>
+            <div className="bg-white p-2 rounded border border-slate-200">
+                <p className="text-xs font-bold text-slate-700 mb-1">Horário do Jogo</p>
                 <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
+                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700 w-full" 
                         value={newList.date} onChange={e => setNewList({...newList, date: e.target.value})} />
-                    <input required type="time" step="600" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
-                        value={newList.time} onChange={e => setNewList({...newList, time: e.target.value})} />
+                    
+                    <TimePicker value={newList.time} onChange={v => setNewList({...newList, time: v})} />
                 </div>
             </div>
 
-            <div className="bg-white p-2 rounded border border-purple-100">
-                <p className="text-xs font-bold text-purple-700 mb-1">Liberação para Convidados</p>
+            <div className="bg-white p-2 rounded border border-slate-200">
+                <p className="text-xs font-bold text-slate-700 mb-1">Liberação para Convidados</p>
                 <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
+                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700 w-full" 
                         value={newList.guestDate} onChange={e => setNewList({...newList, guestDate: e.target.value})} />
-                    <input required type="time" step="600" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
-                        value={newList.guestTime} onChange={e => setNewList({...newList, guestTime: e.target.value})} />
+                    
+                    <TimePicker value={newList.guestTime} onChange={v => setNewList({...newList, guestTime: v})} />
                 </div>
             </div>
 
             <div>
-                <label className="text-xs text-purple-700 font-bold">Vagas Máx. (Mínimo 6)</label>
-                <input type="number" min="6" className="w-full p-2 rounded text-sm border border-slate-200" 
+                <label className="text-xs text-slate-700 font-bold">Vagas (Máx. 30 - Min. 6)</label>
+                <input type="number" min="6" max="30" className="w-full p-2 rounded text-sm border border-slate-200" 
                     value={newList.maxSpots} onChange={e => setNewList({...newList, maxSpots: parseInt(e.target.value)})} />
             </div>
 
-            <button className="w-full bg-purple-600 text-white py-2 rounded font-bold hover:bg-purple-500">Criar Sessão</button>
+            <button className="w-full bg-slate-900 text-yellow-400 py-2 rounded font-bold hover:bg-slate-800">Criar Sessão</button>
             {msg && <p className="text-green-600 text-xs text-center">{msg}</p>}
           </form>
         </div>
@@ -309,7 +362,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                   <div className="font-bold text-sm text-slate-800 truncate">
                       {u.nickname || u.fullName}
                       {u.role === 0 && <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-1 rounded">PENDENTE</span>}
-                      {u.role === 2 && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1 rounded">ADMIN</span>}
+                      {u.role === 2 && <span className="ml-2 text-[10px] bg-slate-800 text-yellow-400 px-1 rounded">ADEMIRO</span>}
                       {u.role === 3 && <span className="ml-2 text-[10px] bg-indigo-900 text-white px-1 rounded">DEV</span>}
                   </div>
                   <div className="text-xs text-slate-500 truncate">{u.email}</div>

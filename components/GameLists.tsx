@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameSession, User, ListPlayer } from '../types';
 import { db } from '../lib/mockFirebase';
-import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle } from 'lucide-react';
+import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock } from 'lucide-react';
 
 // --- Helper Functions ---
 const formatTime = (isoDate: string, time: string) => {
@@ -15,6 +15,43 @@ const getDayOfWeek = (isoDate: string) => {
     const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const d = new Date(isoDate);
     return days[d.getDay()];
+};
+
+// --- TimePicker Component (Custom 10-min interval) ---
+const TimePicker = ({ value, onChange, className = "", compact = false }: { value: string, onChange: (v: string) => void, className?: string, compact?: boolean }) => {
+    const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
+    const minutes = ['00', '10', '20', '30', '40', '50'];
+    
+    // Ensure value is HH:MM
+    const [h, m] = (value && value.includes(':')) ? value.split(':') : ['', ''];
+
+    const update = (newH: string, newM: string) => {
+        onChange(`${newH}:${newM}`);
+    };
+
+    const baseSelectClass = `appearance-none bg-white border border-slate-200 rounded text-slate-700 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 transition-colors ${compact ? 'text-xs p-0.5' : 'text-sm p-2'}`;
+
+    return (
+        <div className={`flex items-center gap-1 ${className}`}>
+            <select 
+                value={h} 
+                onChange={e => update(e.target.value, m || '00')}
+                className={baseSelectClass}
+            >
+                {!h && <option value="" disabled>--</option>}
+                {hours.map(hh => <option key={hh} value={hh}>{hh}</option>)}
+            </select>
+            <span className={`text-slate-400 font-bold ${compact ? 'text-xs' : ''}`}>:</span>
+            <select 
+                value={m} 
+                onChange={e => update(h || '00', e.target.value)}
+                className={baseSelectClass}
+            >
+                {!m && <option value="" disabled>--</option>}
+                {minutes.map(mm => <option key={mm} value={mm}>{mm}</option>)}
+            </select>
+        </div>
+    );
 };
 
 interface ModalProps {
@@ -40,12 +77,39 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
     const [tempTime, setTempTime] = useState("");
 
+    // Guest Timer State
+    const [timeToGuests, setTimeToGuests] = useState<string | null>(null);
+
     const isPlayerIn = session.players.some(p => p.userId === currentUser.uid);
     const isWaitlisted = session.waitlist.some(p => p.userId === currentUser.uid);
     const hasGuest = session.players.some(p => p.linkedTo === currentUser.uid) || session.waitlist.some(p => p.linkedTo === currentUser.uid);
     const isAdmin = currentUser.role === 2 || currentUser.role === 3;
     const isFull = session.players.length >= session.maxSpots;
     const guestWindowOpen = Date.now() >= session.guestWindowOpenTime;
+
+    // --- Timer Effect ---
+    useEffect(() => {
+        const updateTimer = () => {
+            const now = Date.now();
+            const diff = session.guestWindowOpenTime - now;
+            
+            if (diff <= 0) {
+                setTimeToGuests(null);
+                return;
+            }
+
+            // Calculate hours, minutes, seconds
+            const h = Math.floor(diff / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            setTimeToGuests(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        };
+
+        updateTimer(); // Run immediately
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [session.guestWindowOpenTime]);
 
     // Handlers
     const handleJoin = async () => {
@@ -66,8 +130,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     };
 
     const handleLeave = async () => {
-        // Removing confirm here as well just in case, replacing with direct action
-        // Usually we would want a custom modal, but for now direct action fixes the error
         setLoading(true);
         try {
             await db.leaveSession(session.id, currentUser.uid);
@@ -82,7 +144,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         try {
             await db.joinSession(session.id, currentUser, guestData.arrivalTime, true, guestData);
             setShowGuestForm(false);
-            setGuestData({ ...guestData, name: '', surname: '' });
+            setGuestData({ ...guestData, name: '', surname: '', phone: '' });
             onRefresh();
         } catch (e: any) { console.error(e.message); } 
         finally { setLoading(false); }
@@ -109,7 +171,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         const displayName = p.isGuest ? p.name : (allUsers.find(u => u.uid === p.userId)?.nickname || p.name);
 
         return (
-            <div key={p.userId} className={`flex items-center p-3 border-b border-slate-100 last:border-0 ${isMe ? 'bg-blue-50/50' : ''}`}>
+            <div key={p.userId} className={`flex items-center p-3 border-b border-slate-100 last:border-0 ${isMe ? 'bg-yellow-50/50' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mr-3 shadow-sm 
                     ${isWaitlist ? 'bg-orange-100 text-orange-600' : 'bg-white border border-slate-200 text-slate-600'}`}>
                     {index + 1}
@@ -117,11 +179,11 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                 
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <span className={`font-bold text-sm ${isMe ? 'text-blue-700' : 'text-slate-700'}`}>
+                        <span className={`font-bold text-sm ${isMe ? 'text-slate-900' : 'text-slate-700'}`}>
                             {displayName}
                         </span>
                         {p.isGuest && (
-                             <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
+                             <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">
                                 Conv. {getInviterName(p.linkedTo!)}
                              </span>
                         )}
@@ -131,17 +193,16 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Chegada:</span>
                         {isEditing ? (
                             <div className="flex items-center gap-1">
-                                <input type="time" step="600" className="text-xs p-1 border rounded w-16"
-                                    value={tempTime} onChange={(e) => setTempTime(e.target.value)} />
+                                <TimePicker value={tempTime} onChange={setTempTime} compact />
                                 <button onClick={() => saveTime(p)} className="p-1 bg-green-100 text-green-700 rounded"><Check size={10}/></button>
                                 <button onClick={() => setEditingTimeId(null)} className="p-1 bg-slate-100 text-slate-700 rounded"><X size={10}/></button>
                             </div>
                         ) : (
                             <div className="flex items-center gap-1 group cursor-pointer" onClick={() => { if(isMe) { setEditingTimeId(p.userId); setTempTime(p.arrivalEstimate); }}}>
-                                <span className={`text-xs font-mono font-bold ${isMe ? 'text-blue-600 underline decoration-dotted' : 'text-slate-600'}`}>
+                                <span className={`text-xs font-mono font-bold ${isMe ? 'text-yellow-600 underline decoration-dotted' : 'text-slate-600'}`}>
                                     {p.arrivalEstimate}
                                 </span>
-                                {isMe && <Edit3 size={10} className="text-blue-400 opacity-0 group-hover:opacity-100" />}
+                                {isMe && <Edit3 size={10} className="text-yellow-500 opacity-0 group-hover:opacity-100" />}
                             </div>
                         )}
                     </div>
@@ -154,27 +215,27 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 
-                {/* Header */}
-                <div className="bg-slate-800 text-white p-4 relative shrink-0">
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-700 hover:bg-slate-600 rounded-full text-white transition-colors">
+                {/* Header Modal - Yellow/Black */}
+                <div className="bg-yellow-400 text-slate-900 p-4 relative shrink-0">
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-yellow-500/50 hover:bg-yellow-500 rounded-full text-slate-900 transition-colors">
                         <X size={20} />
                     </button>
                     <div className="pr-12">
-                        <h2 className="text-xl font-bold leading-tight mb-1">{session.name}</h2>
-                        <div className="flex flex-wrap gap-4 text-slate-300 text-sm">
+                        <h2 className="text-xl font-black leading-tight mb-1 tracking-tight">{session.name}</h2>
+                        <div className="flex flex-wrap gap-4 text-slate-800 text-sm font-medium">
                             <div className="flex items-center gap-1.5">
-                                <Calendar size={14} className="text-blue-400"/>
+                                <Calendar size={14} className="text-slate-900"/>
                                 <span className="capitalize">{getDayOfWeek(session.date)}, {formatTime(session.date, session.time)}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <Clock size={14} className="text-blue-400"/>
+                                <Clock size={14} className="text-slate-900"/>
                                 <span>Início: {session.time}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Status Bar */}
+                {/* Status Bar & Timer */}
                 <div className="bg-slate-50 border-b border-slate-100 px-4 py-2 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2">
                         <Users size={16} className="text-slate-400"/>
@@ -182,7 +243,24 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             {session.players.length} <span className="text-slate-400 font-normal">/ {session.maxSpots} confirmados</span>
                         </span>
                     </div>
-                    {/* Botão de Cancelar interno removido ou mantido opcionalmente - o principal agora é o do card */}
+
+                    {/* GUEST TIMER DISPLAY */}
+                    <div className="flex items-center gap-1.5">
+                        {timeToGuests ? (
+                            <>
+                                <span className="hidden sm:inline text-[10px] uppercase font-bold text-slate-400">Convidados em:</span>
+                                <div className="flex items-center gap-1.5 bg-slate-200 px-2 py-1 rounded text-xs font-mono font-bold text-slate-600" title="Tempo para liberar convidados">
+                                    <Lock size={12} className="text-slate-500" />
+                                    {timeToGuests}
+                                </div>
+                            </>
+                        ) : (
+                             <div className="flex items-center gap-1 bg-green-100 px-2 py-0.5 rounded text-[10px] font-bold text-green-700 uppercase">
+                                <Unlock size={12} />
+                                Conv. Liberados
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Scrollable List Area */}
@@ -200,19 +278,18 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             </div>
                         ) : (
                             !isPlayerIn && !isWaitlisted ? (
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <h3 className="text-sm font-bold text-blue-900 mb-2">Vai jogar? Confirme agora!</h3>
-                                    <div className="flex gap-2">
+                                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100">
+                                    <h3 className="text-sm font-bold text-slate-900 mb-2">Vai jogar? Confirme agora!</h3>
+                                    <div className="flex gap-2 items-end">
                                         <div className="flex-1">
-                                            <label className="text-[10px] font-bold text-blue-700 uppercase">Chegada Prevista</label>
-                                            <input type="time" step="600" value={joinTime} onChange={e => setJoinTime(e.target.value)} 
-                                                className="w-full mt-1 p-2 rounded border border-blue-200 text-sm font-bold text-slate-700"/>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Chegada Prevista</label>
+                                            <TimePicker value={joinTime} onChange={setJoinTime} />
                                         </div>
-                                        <button onClick={handleJoin} disabled={loading} className="flex-1 mt-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-2">
-                                            {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Fila' : 'Confirmar')}
+                                        <button onClick={handleJoin} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
+                                            {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Fila' : 'CONFIRMAR')}
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-blue-500 mt-2 flex items-center gap-1">
+                                    <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
                                         <AlertCircle size={10}/> Atraso  30min = Fila de espera automática.
                                     </p>
                                 </div>
@@ -224,8 +301,8 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     {!hasGuest && (
                                         <button onClick={() => setShowGuestForm(!showGuestForm)} disabled={!guestWindowOpen || loading} 
                                             className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-colors
-                                            ${showGuestForm ? 'bg-indigo-600 text-white border-indigo-600' : 
-                                            (!guestWindowOpen ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100')}`}>
+                                            ${showGuestForm ? 'bg-slate-800 text-white border-slate-800' : 
+                                            (!guestWindowOpen ? 'bg-slate-50 text-slate-400 border-slate-100 cursor-not-allowed' : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50')}`}>
                                             <UserPlus size={16}/> {showGuestForm ? 'Cancelar' : 'Convidado'}
                                         </button>
                                     )}
@@ -235,22 +312,20 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
 
                         {/* Guest Form */}
                         {showGuestForm && !joinSuccess && (
-                             <div className="mt-3 bg-indigo-50 p-3 rounded-xl border border-indigo-100 animate-fade-in">
-                                <p className="text-xs font-bold text-indigo-800 mb-2">Dados do Convidado</p>
+                             <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 animate-fade-in">
+                                <p className="text-xs font-bold text-slate-800 mb-2">Dados do Convidado</p>
                                 <div className="space-y-2">
+                                    <input placeholder="Nome do Convidado" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} 
+                                        className="w-full p-2 rounded text-xs border border-slate-200"/>
+                                    
                                     <div className="flex gap-2">
-                                        <input placeholder="Nome" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} 
-                                            className="flex-1 p-2 rounded text-xs border border-indigo-200"/>
-                                        <input placeholder="Sobrenome" value={guestData.surname} onChange={e => setGuestData({...guestData, surname: e.target.value})} 
-                                            className="flex-1 p-2 rounded text-xs border border-indigo-200"/>
+                                         <input placeholder="Telefone / WhatsApp" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} 
+                                            className="flex-[2] p-2 rounded text-xs border border-slate-200"/>
+                                        <div className="flex-1">
+                                            <TimePicker value={guestData.arrivalTime} onChange={(v) => setGuestData({...guestData, arrivalTime: v})} compact />
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                         <input placeholder="Email (Opcional)" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} 
-                                            className="flex-[2] p-2 rounded text-xs border border-indigo-200"/>
-                                          <input type="time" step="600" value={guestData.arrivalTime} onChange={e => setGuestData({...guestData, arrivalTime: e.target.value})} 
-                                            className="flex-1 p-2 rounded text-xs border border-indigo-200 font-bold text-center"/>
-                                    </div>
-                                    <button onClick={handleAddGuest} disabled={loading} className="w-full bg-indigo-600 text-white py-2 rounded font-bold text-xs shadow-sm hover:bg-indigo-700">
+                                    <button onClick={handleAddGuest} disabled={loading} className="w-full bg-slate-900 text-white py-2 rounded font-bold text-xs shadow-sm hover:bg-slate-800">
                                         Adicionar Convidado
                                     </button>
                                 </div>
@@ -302,7 +377,7 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
     const spotsLeft = session.maxSpots - session.players.length;
     
     return (
-        <div onClick={onClick} className="group bg-white rounded-xl p-4 shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer relative overflow-hidden">
+        <div onClick={onClick} className="group bg-white rounded-xl p-4 shadow-sm border border-slate-200 hover:shadow-md hover:border-yellow-300 transition-all cursor-pointer relative overflow-hidden">
             {/* Status Stripe */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${isFull ? 'bg-orange-500' : 'bg-green-500'}`}></div>
             
@@ -329,7 +404,7 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
                     )}
                 </div>
                 
-                <h3 className="font-bold text-slate-800 text-lg leading-tight mb-1 group-hover:text-blue-600 transition-colors">
+                <h3 className="font-bold text-slate-800 text-lg leading-tight mb-1 group-hover:text-yellow-600 transition-colors">
                     {session.name}
                 </h3>
                 
@@ -367,36 +442,22 @@ export default function GameLists({ sessions, currentUser, onRefresh, allUsers }
   const [selectedSession, setSelectedSession] = useState<GameSession | null>(null);
   const isAdmin = currentUser.role === 2 || currentUser.role === 3;
 
-  // Sync selectedSession with the latest data from props (sessions)
   useEffect(() => {
     if (selectedSession) {
       const updated = sessions.find(s => s.id === selectedSession.id);
       if (updated) {
         setSelectedSession(updated);
       } else {
-        // Session deleted or not found
         setSelectedSession(null);
       }
     }
   }, [sessions, selectedSession?.id]);
 
-  // Função Blindada de Apagar Lista (SEM CONFIRM POR CAUSA DO SANDBOX)
   const handleDeleteList = async (idParaApagar: string, e: React.MouseEvent) => {
-    // 1. IMPEDE que o clique "suba" e abra a lista (Stop Propagation)
     e.stopPropagation();
-    console.log("--- DEBUG DELETE ---"); 
-    console.log("Tentando apagar ID:", idParaApagar);
-
-    // REMOVIDO window.confirm por restrição de sandbox do ambiente de preview
-
     try {
-         // 3. Atualização (no caso do Mock, via DB call + refresh)
         await db.deleteSession(idParaApagar);
-        console.log(`Lista ${idParaApagar} removida do banco. Atualizando UI...`);
-        
         onRefresh();
-
-        // 4. Se a lista apagada estiver aberta na tela, fecha ela
         if (selectedSession && selectedSession.id === idParaApagar) {
              setSelectedSession(null);
         }
@@ -428,7 +489,6 @@ export default function GameLists({ sessions, currentUser, onRefresh, allUsers }
         ))}
       </div>
 
-      {/* RENDER MODAL IF SELECTED */}
       {selectedSession && (
         <GameSessionModal 
             session={selectedSession} 

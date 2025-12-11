@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../lib/mockFirebase';
 import { User } from '../types';
-import { Volleyball, AlertCircle, ShieldCheck, Code, User as UserIcon } from 'lucide-react';
+import { Volleyball, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: (user: User) => void;
@@ -11,6 +11,7 @@ export default function Auth({ onSuccess }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [imgError, setImgError] = useState(false);
 
   // Login State
   const [email, setEmail] = useState("");
@@ -78,26 +79,35 @@ export default function Auth({ onSuccess }: AuthProps) {
     <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-900 text-white min-h-screen">
       <div className="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
         
-        {/* Header */}
-        <div className="bg-blue-600 p-6 flex flex-col items-center">
-          <div className="bg-white p-3 rounded-full shadow-lg mb-3">
-            <Volleyball size={32} className="text-blue-600" />
+        {/* Header - BRANDING MANHÃZINHA (Yellow/Black) */}
+        <div className="bg-yellow-400 p-8 flex flex-col items-center text-slate-900">
+          <div className="bg-white p-4 rounded-full shadow-lg mb-4 border-4 border-slate-900 overflow-hidden">
+            {!imgError ? (
+                <img 
+                    src="./mascote.png" 
+                    alt="Manhãzinha Mascote" 
+                    className="w-24 h-24 object-contain" 
+                    onError={() => setImgError(true)}
+                />
+            ) : (
+                <Sun size={64} className="text-yellow-500 fill-yellow-400" /> 
+            )}
           </div>
-          <h1 className="text-2xl font-bold">Gestor VolleyGroup</h1>
-          <p className="text-blue-100 text-sm">Hub Profissional do Time</p>
+          <h1 className="text-3xl font-black tracking-tight uppercase">Manhãzinha</h1>
+          <p className="text-slate-800 font-bold text-sm tracking-wide">Vôlei, Sol e Resenha</p>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-slate-700">
           <button 
             onClick={() => setIsLogin(true)}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${isLogin ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${isLogin ? 'text-yellow-400 border-b-2 border-yellow-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
           >
             Entrar
           </button>
           <button 
             onClick={() => setIsLogin(false)}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLogin ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLogin ? 'text-yellow-400 border-b-2 border-yellow-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
           >
             Cadastrar
           </button>
@@ -117,15 +127,15 @@ export default function Auth({ onSuccess }: AuthProps) {
                 <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
                     <input required type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="voce@exemplo.com" />
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="voce@exemplo.com" />
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Senha (Nasc: ddmmaaaa)</label>
                     <input required type="password" maxLength={8} value={dobPassword} onChange={e => setDobPassword(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="01012000" />
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="01012000" />
                 </div>
-                <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-2 transition-all active:scale-[0.98]">
-                    {loading ? 'Autenticando...' : 'Acessar Painel'}
+                <button disabled={loading} className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black py-3 rounded-lg mt-2 transition-all active:scale-[0.98] shadow-[0_2px_0_rgb(0,0,0)] hover:shadow-none hover:translate-y-[2px]">
+                    {loading ? 'Autenticando...' : 'ACESSAR'}
                 </button>
                 </form>
 
@@ -148,7 +158,7 @@ export default function Auth({ onSuccess }: AuthProps) {
                             className="flex flex-col items-center justify-center p-2 bg-purple-900/30 hover:bg-purple-900/60 text-purple-300 border border-purple-800 rounded-lg transition-colors group"
                         >
                             <ShieldCheck size={16} className="mb-1 group-hover:text-white"/>
-                            <span className="text-[10px] font-bold">ADMIN</span>
+                            <span className="text-[10px] font-bold">ADEMIRO</span>
                         </button>
 
                          <button 
@@ -169,21 +179,21 @@ export default function Auth({ onSuccess }: AuthProps) {
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Nome Completo</label>
                 <input required type="text" placeholder="Seu nome completo" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
               </div>
               
               {/* Row 2: Telefone */}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Celular / WhatsApp</label>
                 <input required type="tel" maxLength={15} placeholder="(99) 99999-9999" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
               </div>
 
               {/* Row 3: Email */}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
                 <input required type="email" placeholder="seu@email.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
               </div>
               
               {/* Row 4: Nascimento e Gênero */}
@@ -191,13 +201,13 @@ export default function Auth({ onSuccess }: AuthProps) {
                  <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Nascimento</label>
                     <input required type="text" maxLength={8} placeholder="ddmmaaaa" value={regData.dob} onChange={e => setRegData({...regData, dob: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
                  </div>
                  
                  <div>
                     <label className="block text-xs font-medium text-slate-400 mb-1">Gênero</label>
                     <select value={regData.gender} onChange={e => setRegData({...regData, gender: e.target.value as any})}
-                       className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                       className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
                         <option value="M">Masculino</option>
                         <option value="F">Feminino</option>
                         <option value="O">Outro</option>
@@ -207,7 +217,7 @@ export default function Auth({ onSuccess }: AuthProps) {
               
               <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento (ddmmaaaa) será sua senha.</p>
               
-              <button disabled={loading} className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98]">
+              <button disabled={loading} className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98]">
                 {loading ? 'Criando...' : 'Criar Conta'}
               </button>
             </form>
