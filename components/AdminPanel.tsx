@@ -203,7 +203,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                 <div className="grid grid-cols-2 gap-2">
                     <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
                         value={newList.date} onChange={e => setNewList({...newList, date: e.target.value})} />
-                    <input required type="time" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
+                    <input required type="time" step="600" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
                         value={newList.time} onChange={e => setNewList({...newList, time: e.target.value})} />
                 </div>
             </div>
@@ -213,7 +213,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                 <div className="grid grid-cols-2 gap-2">
                     <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
                         value={newList.guestDate} onChange={e => setNewList({...newList, guestDate: e.target.value})} />
-                    <input required type="time" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
+                    <input required type="time" step="600" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700" 
                         value={newList.guestTime} onChange={e => setNewList({...newList, guestTime: e.target.value})} />
                 </div>
             </div>

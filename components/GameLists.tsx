@@ -6,7 +6,6 @@ import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2
 // --- Helper Functions ---
 const formatTime = (isoDate: string, time: string) => {
   const d = new Date(isoDate);
-  // Add timezone offset correction if needed, but for prototype we stick to string logic or simple dates
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   return `${day}/${month}`;
@@ -15,9 +14,7 @@ const formatTime = (isoDate: string, time: string) => {
 const getDayOfWeek = (isoDate: string) => {
     const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const d = new Date(isoDate);
-    // Fix timezone issue by appending time or handling as UTC/Local string
-    // Simple hack for prototype: use the date part directly
-    return days[d.getDay()]; // Note: In real app, ensure timezone consistency
+    return days[d.getDay()];
 };
 
 interface ModalProps {
@@ -56,14 +53,12 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         setLoading(true);
         try {
             await db.joinSession(session.id, currentUser, joinTime);
-            // Show success state BEFORE refreshing data to give visual feedback
+            onRefresh();
             setLoading(false);
             setJoinSuccess(true);
-            
             setTimeout(() => {
-                onRefresh();
                 setJoinSuccess(false);
-            }, 2000); // 2 seconds delay to show "Success"
+            }, 2000); 
         } catch (e: any) { 
             alert(e.message); 
             setLoading(false);
@@ -71,26 +66,14 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     };
 
     const handleLeave = async () => {
-        if (window.confirm("Sair da lista? Seus convidados também serão removidos.")) {
-            setLoading(true);
-            try {
-                await db.leaveSession(session.id, currentUser.uid);
-                onRefresh();
-            } catch (e: any) { alert(e.message); } 
-            finally { setLoading(false); }
-        }
-    };
-
-    const handleDelete = async () => {
-        if (window.confirm("CANCELAR JOGO? Isso notificará todos.")) {
-            setLoading(true);
-            try {
-                await db.deleteSession(session.id);
-                onClose(); // Close modal immediately
-                onRefresh();
-            } catch (e: any) { alert(e.message); }
-            finally { setLoading(false); }
-        }
+        // Removing confirm here as well just in case, replacing with direct action
+        // Usually we would want a custom modal, but for now direct action fixes the error
+        setLoading(true);
+        try {
+            await db.leaveSession(session.id, currentUser.uid);
+            onRefresh();
+        } catch (e: any) { console.error(e.message); } 
+        finally { setLoading(false); }
     };
 
     const handleAddGuest = async (e: React.FormEvent) => {
@@ -101,7 +84,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             setShowGuestForm(false);
             setGuestData({ ...guestData, name: '', surname: '' });
             onRefresh();
-        } catch (e: any) { alert(e.message); } 
+        } catch (e: any) { console.error(e.message); } 
         finally { setLoading(false); }
     };
 
@@ -111,7 +94,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             await db.updatePlayerArrival(session.id, p.userId, tempTime);
             setEditingTimeId(null);
             onRefresh();
-        } catch (e: any) { alert(e.message); }
+        } catch (e: any) { console.error(e.message); }
     };
 
     // Renders
@@ -148,7 +131,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Chegada:</span>
                         {isEditing ? (
                             <div className="flex items-center gap-1">
-                                <input type="time" className="text-xs p-1 border rounded w-16"
+                                <input type="time" step="600" className="text-xs p-1 border rounded w-16"
                                     value={tempTime} onChange={(e) => setTempTime(e.target.value)} />
                                 <button onClick={() => saveTime(p)} className="p-1 bg-green-100 text-green-700 rounded"><Check size={10}/></button>
                                 <button onClick={() => setEditingTimeId(null)} className="p-1 bg-slate-100 text-slate-700 rounded"><X size={10}/></button>
@@ -199,17 +182,13 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             {session.players.length} <span className="text-slate-400 font-normal">/ {session.maxSpots} confirmados</span>
                         </span>
                     </div>
-                    {isAdmin && (
-                        <button onClick={handleDelete} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded flex items-center gap-1">
-                            <Trash2 size={12}/> Cancelar Jogo
-                        </button>
-                    )}
+                    {/* Botão de Cancelar interno removido ou mantido opcionalmente - o principal agora é o do card */}
                 </div>
 
                 {/* Scrollable List Area */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4">
                     
-                    {/* User Action Area (Pinned top of scroll or inline) */}
+                    {/* User Action Area */}
                     <div className="mb-6 transition-all duration-300">
                         {joinSuccess ? (
                             <div className="bg-green-100 border border-green-200 text-green-800 p-6 rounded-xl flex flex-col items-center justify-center animate-fade-in text-center shadow-inner">
@@ -226,7 +205,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     <div className="flex gap-2">
                                         <div className="flex-1">
                                             <label className="text-[10px] font-bold text-blue-700 uppercase">Chegada Prevista</label>
-                                            <input type="time" value={joinTime} onChange={e => setJoinTime(e.target.value)} 
+                                            <input type="time" step="600" value={joinTime} onChange={e => setJoinTime(e.target.value)} 
                                                 className="w-full mt-1 p-2 rounded border border-blue-200 text-sm font-bold text-slate-700"/>
                                         </div>
                                         <button onClick={handleJoin} disabled={loading} className="flex-1 mt-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-2">
@@ -268,7 +247,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     <div className="flex gap-2">
                                          <input placeholder="Email (Opcional)" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} 
                                             className="flex-[2] p-2 rounded text-xs border border-indigo-200"/>
-                                          <input type="time" value={guestData.arrivalTime} onChange={e => setGuestData({...guestData, arrivalTime: e.target.value})} 
+                                          <input type="time" step="600" value={guestData.arrivalTime} onChange={e => setGuestData({...guestData, arrivalTime: e.target.value})} 
                                             className="flex-1 p-2 rounded text-xs border border-indigo-200 font-bold text-center"/>
                                     </div>
                                     <button onClick={handleAddGuest} disabled={loading} className="w-full bg-indigo-600 text-white py-2 rounded font-bold text-xs shadow-sm hover:bg-indigo-700">
@@ -314,9 +293,11 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
 interface SessionSummaryCardProps {
     session: GameSession;
     onClick: () => void;
+    onDelete?: (id: string, e: React.MouseEvent) => void;
+    canDelete: boolean;
 }
 
-const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClick }) => {
+const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClick, onDelete, canDelete }) => {
     const isFull = session.players.length >= session.maxSpots;
     const spotsLeft = session.maxSpots - session.players.length;
     
@@ -325,8 +306,19 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
             {/* Status Stripe */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${isFull ? 'bg-orange-500' : 'bg-green-500'}`}></div>
             
+            {/* Delete Button (Overlay) - Only if canDelete */}
+            {canDelete && onDelete && (
+                <button 
+                    onClick={(e) => onDelete(session.id, e)}
+                    className="absolute top-2 right-2 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors z-10"
+                    title="Excluir Lista"
+                >
+                    <Trash2 size={16} />
+                </button>
+            )}
+            
             <div className="pl-3">
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start mb-2 pr-6">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         {getDayOfWeek(session.date)}
                     </span>
@@ -373,6 +365,45 @@ interface GameListsProps {
 
 export default function GameLists({ sessions, currentUser, onRefresh, allUsers }: GameListsProps) {
   const [selectedSession, setSelectedSession] = useState<GameSession | null>(null);
+  const isAdmin = currentUser.role === 2 || currentUser.role === 3;
+
+  // Sync selectedSession with the latest data from props (sessions)
+  useEffect(() => {
+    if (selectedSession) {
+      const updated = sessions.find(s => s.id === selectedSession.id);
+      if (updated) {
+        setSelectedSession(updated);
+      } else {
+        // Session deleted or not found
+        setSelectedSession(null);
+      }
+    }
+  }, [sessions, selectedSession?.id]);
+
+  // Função Blindada de Apagar Lista (SEM CONFIRM POR CAUSA DO SANDBOX)
+  const handleDeleteList = async (idParaApagar: string, e: React.MouseEvent) => {
+    // 1. IMPEDE que o clique "suba" e abra a lista (Stop Propagation)
+    e.stopPropagation();
+    console.log("--- DEBUG DELETE ---"); 
+    console.log("Tentando apagar ID:", idParaApagar);
+
+    // REMOVIDO window.confirm por restrição de sandbox do ambiente de preview
+
+    try {
+         // 3. Atualização (no caso do Mock, via DB call + refresh)
+        await db.deleteSession(idParaApagar);
+        console.log(`Lista ${idParaApagar} removida do banco. Atualizando UI...`);
+        
+        onRefresh();
+
+        // 4. Se a lista apagada estiver aberta na tela, fecha ela
+        if (selectedSession && selectedSession.id === idParaApagar) {
+             setSelectedSession(null);
+        }
+    } catch(err: any) {
+        console.error("Erro ao apagar: ", err.message);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -391,6 +422,8 @@ export default function GameLists({ sessions, currentUser, onRefresh, allUsers }
                 key={session.id} 
                 session={session} 
                 onClick={() => setSelectedSession(session)} 
+                onDelete={handleDeleteList}
+                canDelete={isAdmin}
             />
         ))}
       </div>
@@ -403,15 +436,6 @@ export default function GameLists({ sessions, currentUser, onRefresh, allUsers }
             onClose={() => setSelectedSession(null)}
             onRefresh={() => {
                 onRefresh();
-                // We assume onRefresh updates the parent 'sessions' prop. 
-                // We need to keep the local 'selectedSession' in sync or close it if deleted.
-                // For a prototype, simply re-finding the session in the new props would be ideal, 
-                // but closing/re-opening is also fine.
-                // Let's try to update the local ref if it exists in the new list (handled by effect in a real app, 
-                // here we rely on the fact that 'session' prop in modal will be stale unless we do something clever).
-                // Hack: We pass the *Object* but the modal might display stale data until re-render. 
-                // Better approach: User click refresh -> Parent fetches -> Parent re-renders GameLists -> GameLists re-renders Modal.
-                // We need to ensure 'selectedSession' is updated from the new 'sessions' list.
             }}
             allUsers={allUsers}
         />
