@@ -15,7 +15,7 @@ const TimePicker = ({ value, onChange, className = "" }: { value: string, onChan
         onChange(`${newH}:${newM}`);
     };
 
-    const baseSelectClass = "appearance-none w-full bg-slate-50 border border-slate-200 rounded p-2 text-sm text-slate-700 outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 transition-colors";
+    const baseSelectClass = "appearance-none w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded p-2 text-sm text-slate-700 dark:text-white outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 dark:focus:ring-yellow-500/30 transition-colors";
 
     return (
         <div className={`flex items-center gap-1 ${className}`}>
@@ -194,24 +194,45 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       return u ? (u.nickname || u.fullName) : 'Desconhecido';
   };
 
+  // Convert ddmmaaaa to yyyy-mm-dd for input date value
+  const formatDobForInput = (dob: string) => {
+    if (!dob || dob.length !== 8) return '';
+    const d = dob.slice(0, 2);
+    const m = dob.slice(2, 4);
+    const y = dob.slice(4, 8);
+    return `${y}-${m}-${d}`;
+  };
+
+  const formatPhone = (phone: string) => {
+      if (!phone) return "";
+      const cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length === 11) {
+          return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+      }
+      if (cleaned.length === 10) {
+          return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+      }
+      return phone;
+  };
+
   return (
-    <div className="space-y-6 mt-8 border-t border-slate-200 pt-8 relative">
-      <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div className="space-y-6 mt-8 border-t border-slate-200 dark:border-slate-700 pt-8 relative transition-colors">
+      <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
         Painel do {isDev ? 'DEV' : 'ADEMIRO'}
       </h2>
 
       {/* Admin Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
         <button 
           onClick={() => setActiveSubTab('create')}
-          className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'create' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
+          className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'create' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
         >
           Criar Lista
         </button>
         
         <button 
            onClick={() => setActiveSubTab('users')}
-           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
+           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
         >
           Jogadores
         </button>
@@ -220,7 +241,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         {isAdminOrDev && (
             <button 
             onClick={() => setActiveSubTab('matches')}
-            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'matches' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'matches' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
             >
             Partidas
             </button>
@@ -228,7 +249,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
         <button 
            onClick={() => setActiveSubTab('guests')}
-           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'guests' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
+           className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'guests' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
         >
           Convidados
         </button>
@@ -236,7 +257,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         {isDev && (
             <button 
             onClick={() => { setActiveSubTab('logs'); refreshData(); }}
-            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'logs' ? 'bg-slate-900 text-yellow-400' : 'text-slate-600 bg-slate-100'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'logs' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
             >
             Logs / Auditoria
             </button>
@@ -245,26 +266,27 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       
       {/* Create List */}
       {activeSubTab === 'create' && (
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 animate-fade-in">
-          <h3 className="font-bold text-slate-900 mb-4">Nova Lista</h3>
+        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
+          <h3 className="font-bold text-slate-900 dark:text-white mb-4">Nova Lista</h3>
           <form onSubmit={handleCreateList} className="space-y-3">
-            <input required placeholder="Local (ex: Ginásio Municipal)" className="w-full p-2 rounded text-sm border border-slate-200" 
+            <input required placeholder="Local (ex: Ginásio Municipal)" 
+              className="w-full p-2 rounded text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400" 
               value={newList.name} onChange={e => setNewList({...newList, name: e.target.value})} />
             
-            <div className="bg-white p-2 rounded border border-slate-200">
-                <p className="text-xs font-bold text-slate-700 mb-1">Horário do Jogo</p>
+            <div className="bg-white dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Horário do Jogo</p>
                 <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700 w-full" 
+                    <input required type="date" className="p-2 rounded text-sm bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-white w-full" 
                         value={newList.date} onChange={e => setNewList({...newList, date: e.target.value})} />
                     
                     <TimePicker value={newList.time} onChange={v => setNewList({...newList, time: v})} />
                 </div>
             </div>
 
-            <div className="bg-white p-2 rounded border border-slate-200">
-                <p className="text-xs font-bold text-slate-700 mb-1">Liberação para Convidados</p>
+            <div className="bg-white dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Liberação para Convidados</p>
                 <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-slate-50 border border-slate-200 text-slate-700 w-full" 
+                    <input required type="date" className="p-2 rounded text-sm bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-white w-full" 
                         value={newList.guestDate} onChange={e => setNewList({...newList, guestDate: e.target.value})} />
                     
                     <TimePicker value={newList.guestTime} onChange={v => setNewList({...newList, guestTime: v})} />
@@ -272,12 +294,13 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
             </div>
 
             <div>
-                <label className="text-xs text-slate-700 font-bold">Vagas (Máx. 30 - Min. 6)</label>
-                <input type="number" min="6" max="30" className="w-full p-2 rounded text-sm border border-slate-200" 
+                <label className="text-xs text-slate-700 dark:text-slate-400 font-bold">Vagas (Máx. 30 - Min. 6)</label>
+                <input type="number" min="6" max="30" 
+                    className="w-full p-2 rounded text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" 
                     value={newList.maxSpots} onChange={e => setNewList({...newList, maxSpots: parseInt(e.target.value)})} />
             </div>
 
-            <button className="w-full bg-slate-900 text-yellow-400 py-2 rounded font-bold hover:bg-slate-800">Criar Sessão</button>
+            <button className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 py-2 rounded font-bold hover:bg-slate-800 dark:hover:bg-yellow-300">Criar Sessão</button>
             {msg && <p className="text-green-600 text-xs text-center">{msg}</p>}
           </form>
         </div>
@@ -286,20 +309,20 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       {/* MATCH HISTORY TAB */}
       {activeSubTab === 'matches' && isAdminOrDev && (
         <div className="space-y-4 animate-fade-in">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Calendar size={18}/> Histórico e Presença
             </h3>
             {allSessions.length === 0 && <p className="text-slate-400 text-sm">Nenhuma sessão registrada.</p>}
             
             {allSessions.map(session => (
-                <div key={session.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div key={session.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-colors">
                     <div 
                         onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
-                        className="p-3 bg-slate-50 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
+                        className="p-3 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                         <div>
-                            <div className="font-bold text-slate-800 text-sm">{session.name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="font-bold text-slate-800 dark:text-white text-sm">{session.name}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
                                 {new Date(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
                             </div>
                         </div>
@@ -307,16 +330,16 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                     </div>
 
                     {expandedSession === session.id && (
-                        <div className="p-3 border-t border-slate-100 bg-white">
+                        <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
                             <div className="space-y-1">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Lista Principal</p>
                                 {session.players.length === 0 && <p className="text-xs text-slate-300 italic">Vazia</p>}
                                 {session.players.map(p => (
-                                    <div key={p.userId} className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
+                                    <div key={p.userId} className="flex justify-between items-center py-1 border-b border-slate-50 dark:border-slate-700 last:border-0">
                                         <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${p.attended ? 'bg-green-500' : 'bg-red-200'}`}></div>
-                                            <span className={`text-sm ${p.attended ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>
-                                                {p.name} {p.isGuest && <span className="text-[10px] text-indigo-500">(Convidado)</span>}
+                                            <div className={`w-2 h-2 rounded-full ${p.attended ? 'bg-green-500' : 'bg-red-200 dark:bg-red-900'}`}></div>
+                                            <span className={`text-sm ${p.attended ? 'text-slate-800 dark:text-slate-200 font-medium' : 'text-slate-500 dark:text-slate-500'}`}>
+                                                {p.name} {p.isGuest && <span className="text-[10px] text-indigo-500 dark:text-indigo-400">(Convidado)</span>}
                                                 {p.arrivalEstimate && <span className="text-[10px] text-slate-400 ml-1">@{p.arrivalEstimate}</span>}
                                             </span>
                                         </div>
@@ -338,7 +361,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                                      <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Lista de Espera</p>
                                      {session.waitlist.map(p => (
                                         <div key={p.userId} className="flex justify-between items-center py-1">
-                                            <span className="text-sm text-orange-800/60">{p.name}</span>
+                                            <span className="text-sm text-orange-800/60 dark:text-orange-300/60">{p.name}</span>
                                             <span className="text-[10px] text-slate-300">Em espera</span>
                                         </div>
                                      ))}
@@ -353,24 +376,25 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       {/* ALL Users List (Jogadores) */}
       {activeSubTab === 'users' && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({users.length})</h3>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({users.length})</h3>
           <div className="space-y-2 h-64 overflow-y-auto custom-scrollbar">
             {users.map(u => (
-              <div key={u.uid} className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+              <div key={u.uid} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-100 dark:border-slate-600">
                 <div className="flex-1 overflow-hidden mr-2">
-                  <div className="font-bold text-sm text-slate-800 truncate">
+                  <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
                       {u.nickname || u.fullName}
                       {u.role === 0 && <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-1 rounded">PENDENTE</span>}
                       {u.role === 2 && <span className="ml-2 text-[10px] bg-slate-800 text-yellow-400 px-1 rounded">ADEMIRO</span>}
                       {u.role === 3 && <span className="ml-2 text-[10px] bg-indigo-900 text-white px-1 rounded">DEV</span>}
                   </div>
-                  <div className="text-xs text-slate-500 truncate">{u.email}</div>
+                  {/* Changed Email to Phone as requested, now with Formatting */}
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{formatPhone(u.phone)}</div>
                 </div>
 
                 {/* Games Counter Column */}
                 <div className="mx-2 text-center w-16">
-                     <div className="text-xs font-bold text-slate-800">{u.stats.gamesAttended}</div>
+                     <div className="text-xs font-bold text-slate-800 dark:text-slate-300">{u.stats.gamesAttended}</div>
                      <div className="text-[9px] text-slate-400 uppercase">Jogos</div>
                 </div>
 
@@ -382,7 +406,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                     )}
                     {/* Dev Only: Inspect Button */}
                     {isDev && (
-                        <button onClick={() => setInspectUser(u)} className="p-2 bg-slate-100 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Inspecionar">
+                        <button onClick={() => setInspectUser(u)} className="p-2 bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-500 rounded transition-colors" title="Inspecionar">
                             <Eye size={16} />
                         </button>
                     )}
@@ -395,21 +419,21 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       {/* Guest History Tab */}
       {activeSubTab === 'guests' && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
-           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UsersIcon size={16}/> Histórico de Convidados</h3>
-           <p className="text-xs text-slate-500 mb-3">Lista de todos os convidados que já foram inseridos em listas, permitindo marcar presença manual.</p>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
+           <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UsersIcon size={16}/> Histórico de Convidados</h3>
+           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Lista de todos os convidados que já foram inseridos em listas, permitindo marcar presença manual.</p>
            
            <div className="space-y-2 h-64 overflow-y-auto custom-scrollbar">
              {getGuestHistory().length === 0 && <p className="text-slate-400 text-xs">Nenhum convidado registrado no histórico.</p>}
              {getGuestHistory().map((guest, idx) => (
-               <div key={idx} className="flex justify-between items-center p-2 bg-slate-50 rounded border border-slate-100">
+               <div key={idx} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-100 dark:border-slate-600">
                  <div>
-                   <div className="font-bold text-sm text-slate-800">{guest.name}</div>
-                   <div className="text-xs text-slate-500">Resp: {getInviterName(guest.inviterId)} • {guest.sessions} jogos</div>
+                   <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{guest.name}</div>
+                   <div className="text-xs text-slate-500 dark:text-slate-400">Resp: {getInviterName(guest.inviterId)} • {guest.sessions} jogos</div>
                  </div>
                  <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" className="w-4 h-4 rounded text-blue-600" />
-                    <span className="text-xs text-slate-600 font-bold">Presente?</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-bold">Presente?</span>
                  </label>
                </div>
              ))}
@@ -419,13 +443,13 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       {/* Logs View (Dev Only) */}
       {activeSubTab === 'logs' && isDev && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
           <div className="flex justify-between items-center mb-4">
-             <h3 className="font-bold text-slate-800 flex items-center gap-2">
+             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                <FileText size={18} />
                Log de Atividades (Acesso Dev)
              </h3>
-             <button onClick={downloadLogs} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded flex items-center gap-1">
+             <button onClick={downloadLogs} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 px-3 py-1 rounded flex items-center gap-1">
                <Download size={12} />
                Baixar .txt
              </button>
@@ -433,12 +457,12 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
           <div className="h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {logs.length === 0 && <p className="text-slate-400 text-sm text-center">Nenhum registro encontrado.</p>}
             {logs.map(log => (
-              <div key={log.id} className="p-2 border-b border-slate-100 text-xs hover:bg-slate-50">
-                <div className="flex justify-between text-slate-400 mb-1">
+              <div key={log.id} className="p-2 border-b border-slate-100 dark:border-slate-700 text-xs hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                <div className="flex justify-between text-slate-400 dark:text-slate-500 mb-1">
                   <span>{new Date(log.timestamp).toLocaleString()}</span>
-                  <span className="font-bold text-slate-600">{log.action}</span>
+                  <span className="font-bold text-slate-600 dark:text-slate-300">{log.action}</span>
                 </div>
-                <div className="text-slate-800">
+                <div className="text-slate-800 dark:text-slate-200">
                   {log.details}
                 </div>
                 {log.authorName && <div className="text-slate-400 mt-1 italic">Por: {log.authorName}</div>}
@@ -451,55 +475,61 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       {/* DEV INSPECTOR MODAL */}
       {inspectUser && isDev && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-4 bg-slate-800 text-white flex justify-between items-center">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white flex justify-between items-center">
                     <h3 className="font-bold flex items-center gap-2"><ShieldAlert size={18}/> Inspetor DEV</h3>
                     <button onClick={() => setInspectUser(null)} className="text-slate-400 hover:text-white"><X size={20}/></button>
                 </div>
                 
                 <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-4">
                     
-                    <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
-                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
+                    <div className="flex items-center gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-bold text-xl">
                             {inspectUser.fullName.charAt(0)}
                         </div>
                         <div>
-                            <h2 className="font-bold text-lg">{inspectUser.fullName}</h2>
-                            <p className="text-xs text-slate-500 font-mono">{inspectUser.uid}</p>
-                            <p className="text-sm text-slate-600">{inspectUser.email}</p>
+                            <h2 className="font-bold text-lg dark:text-white">{inspectUser.fullName}</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{inspectUser.uid}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">{inspectUser.email}</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Telefone</label>
-                            <div className="text-sm font-medium">{inspectUser.phone}</div>
+                            <div className="text-sm font-medium dark:text-slate-200">{formatPhone(inspectUser.phone)}</div>
                         </div>
-                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Data Nasc.</label>
-                            <div className="text-sm font-medium">{inspectUser.dob}</div>
+                            {/* Converted text to date input as requested */}
+                            <input 
+                              type="date" 
+                              disabled 
+                              value={formatDobForInput(inspectUser.dob)}
+                              className="w-full bg-transparent text-sm font-medium dark:text-slate-200 outline-none" 
+                            />
                         </div>
-                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                        <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Jogos</label>
-                            <div className="text-sm font-medium">{inspectUser.stats.gamesAttended}</div>
+                            <div className="text-sm font-medium dark:text-slate-200">{inspectUser.stats.gamesAttended}</div>
                         </div>
-                         <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                         <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Criado em</label>
-                            <div className="text-xs font-medium">{new Date(inspectUser.createdAt).toLocaleDateString()}</div>
+                            <div className="text-xs font-medium dark:text-slate-200">{new Date(inspectUser.createdAt).toLocaleDateString()}</div>
                         </div>
                     </div>
 
-                    <div className="bg-yellow-50 p-3 rounded border border-yellow-100">
-                        <h4 className="text-xs font-bold text-yellow-800 uppercase mb-2">Permissões (Forçar)</h4>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-100 dark:border-yellow-900/30">
+                        <h4 className="text-xs font-bold text-yellow-800 dark:text-yellow-400 uppercase mb-2">Permissões (Forçar)</h4>
                         <div className="flex gap-2">
-                             <button onClick={() => forceChangeRole(inspectUser.uid, 1)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 1 ? 'bg-blue-600 text-white' : 'bg-white border'}`}>User</button>
-                             <button onClick={() => forceChangeRole(inspectUser.uid, 2)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 2 ? 'bg-purple-600 text-white' : 'bg-white border'}`}>Admin</button>
-                             <button onClick={() => forceChangeRole(inspectUser.uid, 3)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 3 ? 'bg-indigo-900 text-white' : 'bg-white border'}`}>Dev</button>
-                             <button onClick={() => forceChangeRole(inspectUser.uid, 0)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 0 ? 'bg-yellow-500 text-white' : 'bg-white border'}`}>Pend</button>
+                             <button onClick={() => forceChangeRole(inspectUser.uid, 1)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 1 ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-700 border dark:border-slate-600 dark:text-slate-300'}`}>User</button>
+                             <button onClick={() => forceChangeRole(inspectUser.uid, 2)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 2 ? 'bg-purple-600 text-white' : 'bg-white dark:bg-slate-700 border dark:border-slate-600 dark:text-slate-300'}`}>Admin</button>
+                             <button onClick={() => forceChangeRole(inspectUser.uid, 3)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 3 ? 'bg-indigo-900 text-white' : 'bg-white dark:bg-slate-700 border dark:border-slate-600 dark:text-slate-300'}`}>Dev</button>
+                             <button onClick={() => forceChangeRole(inspectUser.uid, 0)} className={`flex-1 py-1 text-xs font-bold rounded ${inspectUser.role === 0 ? 'bg-yellow-500 text-white' : 'bg-white dark:bg-slate-700 border dark:border-slate-600 dark:text-slate-300'}`}>Pend</button>
                         </div>
                     </div>
 
-                    <div className="border-t border-slate-100 pt-2">
+                    <div className="border-t border-slate-100 dark:border-slate-700 pt-2">
                         <h4 className="text-xs font-bold text-slate-400 mb-2">Raw Data (JSON)</h4>
                         <pre className="bg-slate-900 text-green-400 p-2 rounded text-[10px] overflow-x-auto">
                             {JSON.stringify(inspectUser, null, 2)}

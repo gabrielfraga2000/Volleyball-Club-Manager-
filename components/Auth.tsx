@@ -76,8 +76,8 @@ export default function Auth({ onSuccess }: AuthProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-900 text-white min-h-screen">
-      <div className="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white min-h-screen transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
         
         {/* Header - BRANDING MANHÃZINHA (Yellow/Black) */}
         <div className="bg-yellow-400 p-8 flex flex-col items-center text-slate-900">
@@ -98,16 +98,16 @@ export default function Auth({ onSuccess }: AuthProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
           <button 
             onClick={() => setIsLogin(true)}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${isLogin ? 'text-yellow-400 border-b-2 border-yellow-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${isLogin ? 'text-yellow-600 dark:text-yellow-400 border-b-2 border-yellow-400 bg-yellow-50 dark:bg-slate-700/50' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
           >
             Entrar
           </button>
           <button 
             onClick={() => setIsLogin(false)}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLogin ? 'text-yellow-400 border-b-2 border-yellow-400 bg-slate-700/50' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 py-4 text-sm font-medium transition-colors ${!isLogin ? 'text-yellow-600 dark:text-yellow-400 border-b-2 border-yellow-400 bg-yellow-50 dark:bg-slate-700/50' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
           >
             Cadastrar
           </button>
@@ -115,7 +115,7 @@ export default function Auth({ onSuccess }: AuthProps) {
 
         <div className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-900/40 border border-red-700 text-red-200 rounded-lg text-sm flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-200 rounded-lg text-sm flex items-center gap-2">
               <AlertCircle size={16} />
               {error}
             </div>
@@ -125,48 +125,48 @@ export default function Auth({ onSuccess }: AuthProps) {
             <>
                 <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
                     <input required type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="voce@exemplo.com" />
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" placeholder="voce@exemplo.com" />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Senha (Nasc: ddmmaaaa)</label>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Senha (Nasc: ddmmaaaa)</label>
                     <input required type="password" maxLength={8} value={dobPassword} onChange={e => setDobPassword(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="01012000" />
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" placeholder="01012000" />
                 </div>
-                <button disabled={loading} className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black py-3 rounded-lg mt-2 transition-all active:scale-[0.98] shadow-[0_2px_0_rgb(0,0,0)] hover:shadow-none hover:translate-y-[2px]">
+                <button disabled={loading} className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 font-black py-3 rounded-lg mt-2 transition-all active:scale-[0.98] shadow-md hover:shadow-lg disabled:opacity-70">
                     {loading ? 'Autenticando...' : 'ACESSAR'}
                 </button>
                 </form>
 
                 {/* Quick Logins */}
-                <div className="mt-8 pt-6 border-t border-slate-700">
-                    <p className="text-[10px] text-slate-500 uppercase font-bold text-center mb-3 tracking-wider">Modo de Teste Rápido</p>
+                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold text-center mb-3 tracking-wider">Modo de Teste Rápido</p>
                     <div className="grid grid-cols-3 gap-2">
                         <button 
                             type="button"
                             onClick={() => handleQuickLogin('dev@volley.com', '01012000')}
-                            className="flex flex-col items-center justify-center p-2 bg-indigo-900/30 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800 rounded-lg transition-colors group"
+                            className="flex flex-col items-center justify-center p-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg transition-colors group"
                         >
-                            <Code size={16} className="mb-1 group-hover:text-white"/>
+                            <Code size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
                             <span className="text-[10px] font-bold">DEV</span>
                         </button>
 
                         <button 
                             type="button"
                             onClick={() => handleQuickLogin('admin@volley.com', '01012000')}
-                            className="flex flex-col items-center justify-center p-2 bg-purple-900/30 hover:bg-purple-900/60 text-purple-300 border border-purple-800 rounded-lg transition-colors group"
+                            className="flex flex-col items-center justify-center p-2 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors group"
                         >
-                            <ShieldCheck size={16} className="mb-1 group-hover:text-white"/>
+                            <ShieldCheck size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
                             <span className="text-[10px] font-bold">ADEMIRO</span>
                         </button>
 
                          <button 
                             type="button"
                             onClick={() => handleQuickLogin('ana@volley.com', '11111111')}
-                            className="flex flex-col items-center justify-center p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-lg transition-colors group"
+                            className="flex flex-col items-center justify-center p-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg transition-colors group"
                         >
-                            <UserIcon size={16} className="mb-1 group-hover:text-white"/>
+                            <UserIcon size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
                             <span className="text-[10px] font-bold">USER</span>
                         </button>
                     </div>
@@ -177,37 +177,37 @@ export default function Auth({ onSuccess }: AuthProps) {
               
               {/* Row 1: Nome Completo */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Nome Completo</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nome Completo</label>
                 <input required type="text" placeholder="Seu nome completo" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
               </div>
               
               {/* Row 2: Telefone */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Celular / WhatsApp</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Celular / WhatsApp</label>
                 <input required type="tel" maxLength={15} placeholder="(99) 99999-9999" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
               </div>
 
               {/* Row 3: Email */}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Email</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
                 <input required type="email" placeholder="seu@email.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
               </div>
               
               {/* Row 4: Nascimento e Gênero */}
               <div className="grid grid-cols-2 gap-3">
                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Nascimento</label>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nascimento</label>
                     <input required type="text" maxLength={8} placeholder="ddmmaaaa" value={regData.dob} onChange={e => setRegData({...regData, dob: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none" />
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
                  </div>
                  
                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Gênero</label>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Gênero</label>
                     <select value={regData.gender} onChange={e => setRegData({...regData, gender: e.target.value as any})}
-                       className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none">
+                       className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors">
                         <option value="M">Masculino</option>
                         <option value="F">Feminino</option>
                         <option value="O">Outro</option>
@@ -217,7 +217,7 @@ export default function Auth({ onSuccess }: AuthProps) {
               
               <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento (ddmmaaaa) será sua senha.</p>
               
-              <button disabled={loading} className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98]">
+              <button disabled={loading} className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98] disabled:opacity-70">
                 {loading ? 'Criando...' : 'Criar Conta'}
               </button>
             </form>
