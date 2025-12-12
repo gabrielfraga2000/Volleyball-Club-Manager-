@@ -8,87 +8,27 @@ const KEY_LOGS = 'vg_system_logs_v1';
 
 // --- Initial Mock Data ---
 
-// 0. DEV User (Top Level)
-const MOCK_DEV: User = {
-  uid: 'dev-001',
-  fullName: 'Desenvolvedor Master',
-  nickname: 'Dev',
-  email: 'dev@volley.com',
-  phone: '0000000000',
-  dob: '01012000',
-  gender: 'O',
-  role: 3, // Dev Role
-  stats: { gamesAttended: 0, gamesMissed: 0 },
+// Novo Usuário Solicitado (Gabriel Fraga) - Role 3 (Dev/Admin)
+const MOCK_GABRIEL: User = {
+  uid: "user-1765497156842",
+  fullName: "Gabriel Fraga",
+  nickname: "Gabriel",
+  email: "gabriel.fraga2000@gmail.com",
+  phone: "22998910728",
+  dob: "09072000",
+  gender: "M",
+  role: 3,
+  stats: {
+    gamesAttended: 0,
+    gamesMissed: 0
+  },
   donations: [],
   notifications: [],
-  createdAt: Date.now()
+  createdAt: 1765497156842 // Timestamp aproximado baseado no ID
 };
 
-// 1. Admin User
-const MOCK_ADMIN: User = {
-  uid: 'admin-001',
-  fullName: 'Admin Sistema',
-  nickname: 'Admin',
-  email: 'admin@volley.com',
-  phone: '0000000000',
-  dob: '01012000',
-  gender: 'O',
-  role: 2, // Admin Role
-  stats: { gamesAttended: 100, gamesMissed: 0 },
-  donations: [],
-  notifications: [],
-  createdAt: Date.now()
-};
-
-// 2. Standard Player 1
-const MOCK_USER_1: User = {
-  uid: 'user-001',
-  fullName: 'Ana Silva',
-  nickname: 'Ana',
-  email: 'ana@volley.com',
-  phone: '11999999999',
-  dob: '11111111',
-  gender: 'F',
-  role: 1, // Player Role
-  stats: { gamesAttended: 12, gamesMissed: 1 },
-  donations: [],
-  notifications: [],
-  createdAt: Date.now()
-};
-
-// 3. Standard Player 2
-const MOCK_USER_2: User = {
-  uid: 'user-002',
-  fullName: 'Bruno Santos',
-  nickname: 'Brunão',
-  email: 'bruno@volley.com',
-  phone: '11888888888',
-  dob: '22222222',
-  gender: 'M',
-  role: 1, // Player Role
-  stats: { gamesAttended: 5, gamesMissed: 0 },
-  donations: [],
-  notifications: [],
-  createdAt: Date.now()
-};
-
-// 4. Standard Player 3
-const MOCK_USER_3: User = {
-  uid: 'user-003',
-  fullName: 'Carla Dias',
-  email: 'carla@volley.com',
-  phone: '11777777777',
-  dob: '33333333',
-  gender: 'F',
-  role: 1, // Player Role
-  stats: { gamesAttended: 20, gamesMissed: 2 },
-  donations: [],
-  notifications: [],
-  createdAt: Date.now()
-};
-
-// Initial Array
-const INITIAL_USERS = [MOCK_DEV, MOCK_ADMIN, MOCK_USER_1, MOCK_USER_2, MOCK_USER_3];
+// Initial Array - Apenas Gabriel
+const INITIAL_USERS = [MOCK_GABRIEL];
 
 // Helper to simulate delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));

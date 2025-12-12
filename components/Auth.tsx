@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../lib/mockFirebase';
 import { User } from '../types';
 import { Volleyball, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
@@ -25,6 +25,17 @@ export default function Auth({ onSuccess }: AuthProps) {
     dob: '',
     gender: 'M' as 'M'|'F'|'O'
   });
+  
+  // Date Parts State for Registration
+  const [dobParts, setDobParts] = useState({ d: '', m: '', y: '' });
+
+  // Update regData.dob whenever dobParts changes
+  useEffect(() => {
+    setRegData(prev => ({
+        ...prev,
+        dob: `${dobParts.d}${dobParts.m}${dobParts.y}`
+    }));
+  }, [dobParts]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,19 +51,6 @@ export default function Auth({ onSuccess }: AuthProps) {
     }
   };
 
-  const handleQuickLogin = async (roleEmail: string, rolePass: string) => {
-    setError("");
-    setLoading(true);
-    try {
-        const user = await db.login(roleEmail, rolePass);
-        onSuccess(user);
-    } catch (err: any) {
-        setError("Login Demo falhou: " + err.message);
-    } finally {
-        setLoading(false);
-    }
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -60,9 +58,16 @@ export default function Auth({ onSuccess }: AuthProps) {
     
     // Validate DOB format strict
     if (!/^\d{8}$/.test(regData.dob)) {
-      setError("Data de nascimento deve ter exatamente 8 dígitos (ddmmaaaa)");
+      setError("Data de nascimento deve estar completa.");
       setLoading(false);
       return;
+    }
+    
+    // Validate Phone format strict (11 digits)
+    if (regData.phone.length !== 11) {
+        setError("O telefone deve conter exatamente 11 números (DDD + Número).");
+        setLoading(false);
+        return;
     }
 
     try {
@@ -75,6 +80,18 @@ export default function Auth({ onSuccess }: AuthProps) {
     }
   };
 
+  // Handle phone input to accept only numbers and max 11 chars
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+      setRegData({ ...regData, phone: val });
+  };
+
+  // Helper for date part inputs
+  const handleDatePartChange = (part: 'd' | 'm' | 'y', val: string) => {
+      const numbersOnly = val.replace(/\D/g, '');
+      setDobParts(prev => ({ ...prev, [part]: numbersOnly }));
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white min-h-screen transition-colors duration-300">
       <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
@@ -84,7 +101,7 @@ export default function Auth({ onSuccess }: AuthProps) {
           <div className="bg-white p-4 rounded-full shadow-lg mb-4 border-4 border-slate-900 overflow-hidden">
             {!imgError ? (
                 <img 
-                    src="./mascote.png" 
+                    src="/mascote.png"
                     alt="Manhãzinha Mascote" 
                     className="w-24 h-24 object-contain" 
                     onError={() => setImgError(true)}
@@ -138,39 +155,6 @@ export default function Auth({ onSuccess }: AuthProps) {
                     {loading ? 'Autenticando...' : 'ACESSAR'}
                 </button>
                 </form>
-
-                {/* Quick Logins */}
-                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold text-center mb-3 tracking-wider">Modo de Teste Rápido</p>
-                    <div className="grid grid-cols-3 gap-2">
-                        <button 
-                            type="button"
-                            onClick={() => handleQuickLogin('dev@volley.com', '01012000')}
-                            className="flex flex-col items-center justify-center p-2 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg transition-colors group"
-                        >
-                            <Code size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
-                            <span className="text-[10px] font-bold">DEV</span>
-                        </button>
-
-                        <button 
-                            type="button"
-                            onClick={() => handleQuickLogin('admin@volley.com', '01012000')}
-                            className="flex flex-col items-center justify-center p-2 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors group"
-                        >
-                            <ShieldCheck size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
-                            <span className="text-[10px] font-bold">ADEMIRO</span>
-                        </button>
-
-                         <button 
-                            type="button"
-                            onClick={() => handleQuickLogin('ana@volley.com', '11111111')}
-                            className="flex flex-col items-center justify-center p-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg transition-colors group"
-                        >
-                            <UserIcon size={16} className="mb-1 group-hover:scale-110 transition-transform"/>
-                            <span className="text-[10px] font-bold">USER</span>
-                        </button>
-                    </div>
-                </div>
             </>
           ) : (
             <form onSubmit={handleRegister} className="space-y-3">
@@ -184,9 +168,18 @@ export default function Auth({ onSuccess }: AuthProps) {
               
               {/* Row 2: Telefone */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Celular / WhatsApp</label>
-                <input required type="tel" maxLength={15} placeholder="(99) 99999-9999" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Celular / WhatsApp (Apenas Números)</label>
+                    <span className="text-[10px] text-slate-400">{regData.phone.length}/11</span>
+                </div>
+                <input 
+                    required 
+                    type="tel" 
+                    placeholder="22999999999" 
+                    value={regData.phone} 
+                    onChange={handlePhoneChange}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                />
               </div>
 
               {/* Row 3: Email */}
@@ -196,15 +189,42 @@ export default function Auth({ onSuccess }: AuthProps) {
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
               </div>
               
-              {/* Row 4: Nascimento e Gênero */}
-              <div className="grid grid-cols-2 gap-3">
-                 <div>
+              {/* Row 4: Nascimento (Split) e Gênero - Layout Ajustado 2/3 para Data e 1/3 para Gênero */}
+              <div className="grid grid-cols-3 gap-3">
+                 <div className="col-span-2">
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nascimento</label>
-                    <input required type="text" maxLength={8} placeholder="ddmmaaaa" value={regData.dob} onChange={e => setRegData({...regData, dob: e.target.value})}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
+                    <div className="flex gap-2">
+                        <input 
+                            required 
+                            type="text" 
+                            maxLength={2} 
+                            placeholder="DD" 
+                            value={dobParts.d} 
+                            onChange={e => handleDatePartChange('d', e.target.value)}
+                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
+                        <input 
+                            required 
+                            type="text" 
+                            maxLength={2} 
+                            placeholder="MM" 
+                            value={dobParts.m} 
+                            onChange={e => handleDatePartChange('m', e.target.value)}
+                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
+                        <input 
+                            required 
+                            type="text" 
+                            maxLength={4} 
+                            placeholder="AAAA" 
+                            value={dobParts.y} 
+                            onChange={e => handleDatePartChange('y', e.target.value)}
+                            className="flex-[1.5] min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
+                    </div>
                  </div>
                  
-                 <div>
+                 <div className="col-span-1">
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Gênero</label>
                     <select value={regData.gender} onChange={e => setRegData({...regData, gender: e.target.value as any})}
                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors">
@@ -215,7 +235,7 @@ export default function Auth({ onSuccess }: AuthProps) {
                  </div>
               </div>
               
-              <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento (ddmmaaaa) será sua senha.</p>
+              <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento será sua senha.</p>
               
               <button disabled={loading} className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98] disabled:opacity-70">
                 {loading ? 'Criando...' : 'Criar Conta'}
