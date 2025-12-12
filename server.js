@@ -10,40 +10,97 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// Database Setup
+// --- Initial Data Seed ---
+const SEED_USER = {
+  uid: "user-1765497156842",
+  fullName: "Gabriel Fraga",
+  nickname: "Gabriel",
+  email: "gabriel.fraga2000@gmail.com",
+  phone: "22998910728",
+  dob: "09072000",
+  gender: "M",
+  role: 3, // Dev/Admin
+  stats: { gamesAttended: 0, gamesMissed: 0 },
+  donations: [],
+  notifications: [],
+  createdAt: 1765497156842
+};
+
+const SEED_SESSION = {
+    id: 'session-default-1212',
+    name: 'Vôlei de Quinta',
+    date: '2025-12-12',
+    time: '19:00',
+    guestWindowOpenTime: 0,
+    maxSpots: 18,
+    players: [],
+    waitlist: [],
+    createdBy: 'system',
+    status: 'open'
+};
+
 let db;
 
+// Initialize DB and Start Server
 (async () => {
-  db = await open({
-    filename: './database.sqlite',
-    driver: sqlite3.Database
-  });
+  try {
+    db = await open({
+      filename: './database.sqlite',
+      driver: sqlite3.Database
+    });
 
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      uid TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      data TEXT
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      date TEXT,
-      time TEXT,
-      data TEXT
-    );
-    CREATE TABLE IF NOT EXISTS logs (
-      id TEXT PRIMARY KEY,
-      timestamp INTEGER,
-      data TEXT
-    );
-  `);
+    console.log('Database connected.');
 
-  console.log('Connected to SQLite database.');
+    // Create Tables
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        uid TEXT PRIMARY KEY,
+        email TEXT UNIQUE,
+        data TEXT
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        date TEXT,
+        time TEXT,
+        data TEXT
+      );
+      CREATE TABLE IF NOT EXISTS logs (
+        id TEXT PRIMARY KEY,
+        timestamp INTEGER,
+        data TEXT
+      );
+    `);
+
+    // --- SEED DATA ---
+    
+    // Check and Insert User
+    const userExists = await db.get('SELECT uid FROM users WHERE uid = ?', SEED_USER.uid);
+    if (!userExists) {
+        await db.run('INSERT INTO users (uid, email, data) VALUES (?, ?, ?)', 
+            SEED_USER.uid, SEED_USER.email, JSON.stringify(SEED_USER));
+        console.log('Seed: Usuário Gabriel criado.');
+    }
+
+    // Check and Insert Session
+    const sessionExists = await db.get('SELECT id FROM sessions WHERE id = ?', SEED_SESSION.id);
+    if (!sessionExists) {
+        await db.run('INSERT INTO sessions (id, date, time, data) VALUES (?, ?, ?, ?)', 
+            SEED_SESSION.id, SEED_SESSION.date, SEED_SESSION.time, JSON.stringify(SEED_SESSION));
+        console.log('Seed: Sessão 12/12 criada.');
+    }
+
+    // Start Server only AFTER DB is ready
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+
+  } catch (e) {
+    console.error('Failed to start server:', e);
+  }
 })();
 
 // --- Routes ---
 
-// GET Initial Data (Dashboard polling)
 app.get('/api/data', async (req, res) => {
   try {
     const usersRaw = await db.all('SELECT data FROM users');
@@ -61,15 +118,19 @@ app.get('/api/data', async (req, res) => {
 // Auth & User Operations
 app.post('/api/users/login', async (req, res) => {
   const { email, dob } = req.body;
+  if (!db) return res.status(500).json({ error: "Database not ready" });
+  
   try {
     const result = await db.get('SELECT data FROM users WHERE email = ?', email);
     if (!result) return res.status(404).json({ error: "Usuário não encontrado." });
     
     const user = JSON.parse(result.data);
-    if (user.dob !== dob) return res.status(401).json({ error: "Data de nascimento incorreta." });
+    // Simple password check (DOB)
+    if (user.dob !== dob) return res.status(401).json({ error: "Senha incorreta (Data de Nascimento)." });
     
     res.json(user);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -153,8 +214,4 @@ app.post('/api/logs', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
 });

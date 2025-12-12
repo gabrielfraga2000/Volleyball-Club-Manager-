@@ -11,17 +11,47 @@ const getMinutes = (timeStr: string | undefined) => {
     return (h || 0) * 60 + (m || 0);
 };
 
-// We will keep a local cache for synchronous getters to keep the app feeling fast
-// But we must initialize this cache at app start
+// Local cache
 let localUsersCache: User[] = [];
 let localSessionsCache: GameSession[] = [];
+
+// Helper to safely parse JSON response
+async function fetchJson(url: string, options?: RequestInit) {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    
+    if (!res.ok) {
+        let errorMsg = `Erro ${res.status}: ${res.statusText}`;
+        try {
+            // Try to parse error details from JSON
+            if (text) {
+                const json = JSON.parse(text);
+                errorMsg = json.error || errorMsg;
+            }
+        } catch (e) {
+            // If text is not JSON (e.g. HTML error page or empty), use text snippet or default msg
+            console.error("Non-JSON Error Response:", text);
+            errorMsg = `Erro de conexão ou servidor (${res.status})`;
+        }
+        throw new Error(errorMsg);
+    }
+
+    try {
+        return text ? JSON.parse(text) : null;
+    } catch (e) {
+        throw new Error("Resposta inválida do servidor (Não é JSON)");
+    }
+}
 
 export const db = {
   // --- Logger Methods ---
   async getLogs(): Promise<SystemLog[]> {
-    const res = await fetch(`${API_URL}/logs`);
-    if (!res.ok) return [];
-    return res.json();
+    try {
+        return await fetchJson(`${API_URL}/logs`);
+    } catch (e) {
+        console.error("Error fetching logs", e);
+        return [];
+    }
   },
 
   async addLog(action: string, details: string, authorName?: string) {
@@ -32,15 +62,16 @@ export const db = {
       details,
       authorName
     };
-    await fetch(`${API_URL}/logs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newLog)
-    });
+    try {
+        await fetchJson(`${API_URL}/logs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLog)
+        });
+    } catch (e) { console.error("Log failed", e); }
   },
 
-  // --- Sync Methods (Maintained for React Components that need Sync Data) ---
-  // The components must call refreshData() to update these caches
+  // --- Sync Methods ---
   getUsersSync(): User[] {
       return localUsersCache;
   },
@@ -51,32 +82,25 @@ export const db = {
 
   async refreshData() {
       try {
-        const res = await fetch(`${API_URL}/data`);
-        if (res.ok) {
-            const data = await res.json();
-            localUsersCache = data.users;
-            localSessionsCache = data.sessions;
+        const data = await fetchJson(`${API_URL}/data`);
+        if (data) {
+            localUsersCache = data.users || [];
+            localSessionsCache = data.sessions || [];
         }
       } catch (e) {
-          console.error("Failed to refresh data", e);
+          console.error("Failed to refresh data (Is server running?)", e);
       }
       return { users: localUsersCache, sessions: localSessionsCache };
   },
 
   // --- Auth Methods ---
   async login(email: string, passwordDOB: string): Promise<User> {
-    const res = await fetch(`${API_URL}/users/login`, {
+    const user = await fetchJson(`${API_URL}/users/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, dob: passwordDOB })
     });
     
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Falha no login");
-    }
-
-    const user = await res.json();
     localStorage.setItem('vg_auth_user_v2', JSON.stringify(user));
     return user;
   },
@@ -99,22 +123,16 @@ export const db = {
       createdAt: Date.now()
     };
 
-    const res = await fetch(`${API_URL}/users`, {
+    await fetchJson(`${API_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser)
     });
-
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Falha ao registrar");
-    }
     
     await this.addLog("REGISTER", `Novo usuário registrado: ${newUser.fullName} (${newUser.email})`);
     
-    // Auto-login after register
+    // Auto-login
     localStorage.setItem('vg_auth_user_v2', JSON.stringify(newUser));
-    // Update cache
     await this.refreshData();
     return newUser;
   },
@@ -142,13 +160,12 @@ export const db = {
     
     const updatedUser = { ...user, ...data };
     
-    await fetch(`${API_URL}/users/${uid}`, {
+    await fetchJson(`${API_URL}/users/${uid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedUser)
     });
 
-    // Update auth user if it's the current one
     const currentUser = this.getCurrentUser();
     if (currentUser && currentUser.uid === uid) {
         localStorage.setItem('vg_auth_user_v2', JSON.stringify(updatedUser));
@@ -164,8 +181,7 @@ export const db = {
       const oldRole = user.role;
       user.role = newRole;
       
-      // Update User in DB
-      await fetch(`${API_URL}/users/${uid}`, {
+      await fetchJson(`${API_URL}/users/${uid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user)
@@ -173,7 +189,6 @@ export const db = {
 
       await this.addLog("ROLE_CHANGE", `Usuário ${user.fullName} alterado de ${oldRole} para ${newRole}`, "Sistema");
 
-      // NOTIFICATION LOGIC
       let notifMsg = "";
       if (newRole === 1 && oldRole === 0) {
           notifMsg = "🎉 Sua conta foi aprovada! Agora você pode entrar nos jogos.";
@@ -206,7 +221,7 @@ export const db = {
       status: 'open'
     };
     
-    await fetch(`${API_URL}/sessions`, {
+    await fetchJson(`${API_URL}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSession)
@@ -217,13 +232,11 @@ export const db = {
   },
 
   async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any) {
-    // Need fresh data to check constraints
     await this.refreshData();
     const sessions = localSessionsCache;
     const session = sessions.find(s => s.id === sessionId);
     if (!session) throw new Error("Sessão não encontrada.");
 
-    // Check duplication
     const userIdToCheck = isGuest ? `guest-${Date.now()}` : user.uid;
     if (!isGuest) {
         if (session.players.some(p => p.userId === user.uid) || session.waitlist.some(p => p.userId === user.uid)) {
@@ -250,11 +263,9 @@ export const db = {
         session.waitlist.push(listPlayer);
     } else {
         session.players.push(listPlayer);
-        // Progress Notification Logic (simplified for brevity, assume similar to before)
     }
 
-    // Save Updated Session
-    await fetch(`${API_URL}/sessions/${sessionId}`, {
+    await fetchJson(`${API_URL}/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(session)
@@ -274,7 +285,6 @@ export const db = {
     const session = sessions.find(s => s.id === sessionId);
     if (!session) throw new Error("Sessão não encontrada.");
 
-    // 1. Identify User and Guests
     const playersToRemove = [userId];
     const linkedGuests = [...session.players, ...session.waitlist]
         .filter(p => p.linkedTo === userId)
@@ -287,11 +297,9 @@ export const db = {
         if (playersToRemove.includes(p.userId)) removedNames.push(p.name);
     });
 
-    // 2. Remove
     session.players = session.players.filter(p => !playersToRemove.includes(p.userId));
     session.waitlist = session.waitlist.filter(p => !playersToRemove.includes(p.userId));
 
-    // 3. Promotion Logic
     const startMinutes = getMinutes(session.time);
     while (session.players.length < session.maxSpots && session.waitlist.length > 0) {
         const candidateIndex = session.waitlist.findIndex(p => {
@@ -311,14 +319,12 @@ export const db = {
         }
     }
 
-    // Save
-    await fetch(`${API_URL}/sessions/${sessionId}`, {
+    await fetchJson(`${API_URL}/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(session)
     });
 
-    // Log
     const user = localUsersCache.find(u => u.uid === userId);
     const authorName = user ? (user.nickname || user.fullName) : "Usuário";
     await this.addLog("LEAVE", `Saiu do jogo ${session.name}. Removidos: ${removedNames.join(', ')}`, authorName);
@@ -326,7 +332,7 @@ export const db = {
   },
 
   async deleteSession(sessionId: string) {
-      await fetch(`${API_URL}/sessions/${sessionId}`, { method: 'DELETE' });
+      await fetchJson(`${API_URL}/sessions/${sessionId}`, { method: 'DELETE' });
       await this.addLog("DELETE_SESSION", `Sessão ${sessionId} cancelada.`);
       await this.refreshData();
   },
@@ -338,7 +344,7 @@ export const db = {
         const p = session.players.find(p => p.userId === playerId) || session.waitlist.find(p => p.userId === playerId);
         if (p) {
             p.arrivalEstimate = newTime;
-            await fetch(`${API_URL}/sessions/${sessionId}`, {
+            await fetchJson(`${API_URL}/sessions/${sessionId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(session)
@@ -361,8 +367,7 @@ export const db = {
                   if (u) {
                       if (status) u.stats.gamesAttended++;
                       else u.stats.gamesAttended = Math.max(0, u.stats.gamesAttended - 1);
-                      // Update user stats in DB
-                      await fetch(`${API_URL}/users/${u.uid}`, {
+                      await fetchJson(`${API_URL}/users/${u.uid}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(u)
@@ -370,8 +375,7 @@ export const db = {
                   }
               }
 
-              // Update Session in DB
-              await fetch(`${API_URL}/sessions/${sessionId}`, {
+              await fetchJson(`${API_URL}/sessions/${sessionId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(session)
@@ -383,7 +387,6 @@ export const db = {
 
   // --- Notification Methods ---
   async addNotification(userId: string, message: string) {
-      // Need to fetch user first
       const users = await this.getUsers();
       const user = users.find(u => u.uid === userId);
       if (user) {
@@ -393,7 +396,7 @@ export const db = {
               date: Date.now(),
               read: false
           });
-          await fetch(`${API_URL}/users/${userId}`, {
+          await fetchJson(`${API_URL}/users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
@@ -406,7 +409,7 @@ export const db = {
       const user = users.find(u => u.uid === userId);
       if (user) {
           user.notifications.forEach(n => n.read = true);
-          await fetch(`${API_URL}/users/${userId}`, {
+          await fetchJson(`${API_URL}/users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
@@ -424,7 +427,7 @@ export const db = {
       const user = users.find(u => u.uid === userId);
       if (user) {
           user.notifications = [];
-          await fetch(`${API_URL}/users/${userId}`, {
+          await fetchJson(`${API_URL}/users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
