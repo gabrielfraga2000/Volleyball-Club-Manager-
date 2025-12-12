@@ -1,8 +1,8 @@
 import { User, GameSession, ListPlayer, UserStats, AppNotification, SystemLog } from '../types';
 
-// Storage Keys
+// Storage Keys - Updated to v3 to force new session load
 const KEY_USERS = 'vg_users_v2';
-const KEY_SESSIONS = 'vg_sessions_v2';
+const KEY_SESSIONS = 'vg_sessions_v3'; 
 const KEY_AUTH_USER = 'vg_auth_user_v2';
 const KEY_LOGS = 'vg_system_logs_v1';
 
@@ -24,11 +24,27 @@ const MOCK_GABRIEL: User = {
   },
   donations: [],
   notifications: [],
-  createdAt: 1765497156842 // Timestamp aproximado baseado no ID
+  createdAt: 1765497156842
 };
 
 // Initial Array - Apenas Gabriel
 const INITIAL_USERS = [MOCK_GABRIEL];
+
+// Sessão Inicial solicitada (12/12/2025 - 19h - Convidados Liberados)
+const INITIAL_SESSIONS: GameSession[] = [
+    {
+        id: 'session-default-1212',
+        name: 'Vôlei de Quinta',
+        date: '2025-12-12',
+        time: '19:00',
+        guestWindowOpenTime: 0, // 0 garante que já esteja no passado (liberado)
+        maxSpots: 18,
+        players: [],
+        waitlist: [],
+        createdBy: 'system',
+        status: 'open'
+    }
+];
 
 // Helper to simulate delay
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -87,10 +103,17 @@ export const db = {
     const newUser: User = {
       ...data,
       uid: 'user-' + Date.now(),
-      role: 0, // Starts as Pending
+      role: 1, // MUDANÇA: Começa como 1 (Player) em vez de 0 (Pendente)
       stats: { gamesAttended: 0, gamesMissed: 0 },
       donations: [],
-      notifications: [],
+      notifications: [
+        {
+            id: 'welcome-' + Date.now(),
+            message: "Bem-vindo ao Manhãzinha! Sua conta foi criada e você já pode participar dos jogos.",
+            date: Date.now(),
+            read: false
+        }
+      ],
       createdAt: Date.now()
     };
 
@@ -99,6 +122,9 @@ export const db = {
     
     this.addLog("REGISTER", `Novo usuário registrado: ${newUser.fullName} (${newUser.email})`);
     
+    // Auto-login after register
+    localStorage.setItem(KEY_AUTH_USER, JSON.stringify(newUser));
+
     return newUser;
   },
 
@@ -172,7 +198,11 @@ export const db = {
   // --- Session Methods ---
   getSessions(): GameSession[] {
     const stored = localStorage.getItem(KEY_SESSIONS);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) {
+        localStorage.setItem(KEY_SESSIONS, JSON.stringify(INITIAL_SESSIONS));
+        return INITIAL_SESSIONS;
+    }
+    return JSON.parse(stored);
   },
 
   async createSession(sessionData: Omit<GameSession, 'id' | 'players' | 'waitlist' | 'status'>) {
