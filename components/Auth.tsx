@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/mockFirebase';
 import { User } from '../types';
-import { Volleyball, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
+import { Trophy, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
 
 interface AuthProps {
   onSuccess: (user: User) => void;
