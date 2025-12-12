@@ -188,6 +188,18 @@ export const db = {
       }
   },
 
+  async rejectUser(uid: string) {
+      const user = localUsersCache.find(u => u.uid === uid);
+      const name = user ? user.fullName : "Desconhecido";
+      
+      // Remove documento do Firestore
+      // Nota: O usuário ainda existirá no Auth do Firebase, mas sem documento no 'users',
+      // o login irá falhar conforme a lógica em db.login()
+      await deleteDoc(doc(firestore, "users", uid));
+      
+      await this.addLog("REJECT_USER", `Usuário reprovado/excluído: ${name} (${uid})`);
+  },
+
   // --- Session Methods ---
   getSessions(): GameSession[] {
     return localSessionsCache;

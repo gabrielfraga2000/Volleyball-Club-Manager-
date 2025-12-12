@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/api'; // Mudança aqui
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
-import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus, RefreshCw } from 'lucide-react';
+
+// Função auxiliar para data local para evitar problemas de UTC
+const parseDate = (dateStr: string) => {
+    // dateStr deve ser YYYY-MM-DD
+    if (!dateStr) return new Date();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    // Cria data meio-dia para evitar problemas de timezone
+    return new Date(y, m - 1, d, 12, 0, 0);
+};
 
 const TimePicker = ({ value, onChange, className = "" }: { value: string, onChange: (v: string) => void, className?: string }) => {
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
@@ -126,6 +135,12 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
     await db.updateUserRole(uid, newRole as any);
     refreshData();
   };
+  
+  const handleRejectUser = async (uid: string) => {
+      if (!confirm("Tem certeza que deseja reprovar este usuário? Isso irá excluir o cadastro dele.")) return;
+      await db.rejectUser(uid);
+      refreshData();
+  };
 
   const forceChangeRole = async (uid: string, newRole: number) => {
       await db.updateUserRole(uid, newRole as any);
@@ -198,12 +213,22 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   };
 
   const pendingUsers = users.filter(u => u.role === 0);
+  const activeUsers = users.filter(u => u.role !== 0); // Filtra os pendentes da lista principal
 
   return (
     <div className="space-y-6 mt-8 border-t border-slate-200 dark:border-slate-700 pt-8 relative transition-colors">
-      <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-        Painel
-      </h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            Painel
+        </h2>
+        <button 
+            onClick={refreshData} 
+            className="p-2 bg-slate-100 dark:bg-slate-700 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-slate-600 dark:text-slate-300"
+            title="Atualizar Dados"
+        >
+            <RefreshCw size={16} />
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
         <button 
@@ -310,7 +335,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                         <div>
                             <div className="font-bold text-slate-800 dark:text-white text-sm">{session.name}</div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                                {new Date(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
+                                {parseDate(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
                             </div>
                         </div>
                         {expandedSession === session.id ? <ChevronUp size={16} className="text-slate-400"/> : <ChevronDown size={16} className="text-slate-400"/>}
@@ -363,14 +388,13 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       {activeSubTab === 'users' && (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({users.length})</h3>
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({activeUsers.length})</h3>
           <div className="space-y-2 h-64 overflow-y-auto custom-scrollbar">
-            {users.map(u => (
+            {activeUsers.map(u => (
               <div key={u.uid} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-100 dark:border-slate-600">
                 <div className="flex-1 overflow-hidden mr-2">
                   <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
                       {u.nickname || u.fullName}
-                      {u.role === 0 && <span className="ml-2 text-[10px] bg-yellow-100 text-yellow-700 px-1 rounded">PENDENTE</span>}
                       {u.role === 2 && <span className="ml-2 text-[10px] bg-slate-800 text-yellow-400 px-1 rounded">ADEMIRO</span>}
                       {u.role === 3 && <span className="ml-2 text-[10px] bg-indigo-900 text-white px-1 rounded">DEV</span>}
                   </div>
@@ -383,11 +407,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                 </div>
 
                 <div className="flex gap-2">
-                    {u.role === 0 && (
-                        <button onClick={() => toggleRole(u.uid, u.role)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold hover:bg-green-200">
-                        Aprovar
-                        </button>
-                    )}
+                    {/* Botão Aprovar REMOVIDO desta aba */}
                     {isDev && (
                         <button onClick={() => setInspectUser(u)} className="p-2 bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-500 rounded transition-colors" title="Inspecionar">
                             <Eye size={16} />
@@ -417,9 +437,14 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                   <div className="text-[10px] text-slate-400">Criado em: {new Date(u.createdAt).toLocaleDateString()}</div>
                 </div>
 
-                <button onClick={() => toggleRole(u.uid, u.role)} className="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 shadow-sm transition-all active:scale-95">
-                    APROVAR
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={() => handleRejectUser(u.uid)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition-all active:scale-95">
+                        REPROVAR
+                    </button>
+                    <button onClick={() => toggleRole(u.uid, u.role)} className="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 shadow-sm transition-all active:scale-95">
+                        APROVAR
+                    </button>
+                </div>
               </div>
             ))}
           </div>

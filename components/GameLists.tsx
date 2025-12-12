@@ -4,8 +4,16 @@ import { db } from '../lib/api'; // Mudança aqui
 import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock } from 'lucide-react';
 
 // --- Helper Functions ---
+const parseDate = (dateStr: string) => {
+    // dateStr deve ser YYYY-MM-DD
+    if (!dateStr) return new Date();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    // Cria data meio-dia para evitar problemas de timezone
+    return new Date(y, m - 1, d, 12, 0, 0);
+};
+
 const formatTime = (isoDate: string, time: string) => {
-  const d = new Date(isoDate);
+  const d = parseDate(isoDate);
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   return `${day}/${month}`;
@@ -13,7 +21,7 @@ const formatTime = (isoDate: string, time: string) => {
 
 const getDayOfWeek = (isoDate: string) => {
     const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const d = new Date(isoDate);
+    const d = parseDate(isoDate);
     return days[d.getDay()];
 };
 
