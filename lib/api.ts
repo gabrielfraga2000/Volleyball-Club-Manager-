@@ -221,6 +221,12 @@ export const db = {
     await setDoc(newSessionRef, newSession);
     await this.addLog("CREATE_SESSION", `Sessão criada: ${newSession.name} para ${newSession.date}`);
   },
+  
+  async updateSession(sessionId: string, data: Partial<GameSession>) {
+      const sessionRef = doc(firestore, "sessions", sessionId);
+      await updateDoc(sessionRef, data);
+      await this.addLog("UPDATE_SESSION", `Sessão ${sessionId} atualizada.`);
+  },
 
   async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any) {
     const sessionRef = doc(firestore, "sessions", sessionId);
@@ -328,18 +334,61 @@ export const db = {
 
   async updatePlayerArrival(sessionId: string, playerId: string, newTime: string) {
     const sessionRef = doc(firestore, "sessions", sessionId);
-    const session = localSessionsCache.find(s => s.id === sessionId); // Use cache for quick lookup
-    if (!session) return;
+    const sessionDoc = await getDoc(sessionRef);
+    if (!sessionDoc.exists()) return;
+    
+    const session = sessionDoc.data() as GameSession;
 
     // Deep clone to modify
     const newPlayers = [...session.players];
     const newWaitlist = [...session.waitlist];
 
-    let p = newPlayers.find(p => p.userId === playerId);
-    if (p) p.arrivalEstimate = newTime;
+    // Encontra o jogador
+    const playerIndex = newPlayers.findIndex(p => p.userId === playerId);
+    const waitlistIndex = newWaitlist.findIndex(p => p.userId === playerId);
+
+    if (playerIndex !== -1) {
+        // Está na lista principal
+        const player = newPlayers[playerIndex];
+        player.arrivalEstimate = newTime;
+
+        // Verifica se ficou atrasado
+        const startMinutes = getMinutes(session.time);
+        const arrivalMinutes = getMinutes(newTime);
+        const isLate = arrivalMinutes > (startMinutes + 30);
+
+        if (isLate) {
+            // Remove da lista principal e joga pra lista de espera
+            newPlayers.splice(playerIndex, 1);
+            newWaitlist.push(player);
+            
+            // Tenta promover alguém da lista de espera para a vaga que abriu
+            // (Logica de Promoção similar ao Leave)
+            while (newPlayers.length < session.maxSpots && newWaitlist.length > 0) {
+                // Encontra alguém que NÃO esteja atrasado
+                const candidateIndex = newWaitlist.findIndex(p => {
+                    const arrM = getMinutes(p.arrivalEstimate);
+                    return arrM <= (startMinutes + 30);
+                });
+                
+                if (candidateIndex === -1) break; // Só tem gente atrasada na espera
+
+                const [candidate] = newWaitlist.splice(candidateIndex, 1);
+                newPlayers.push(candidate);
+                
+                // Opcional: Notificar o candidato promovido aqui
+            }
+            
+            await this.addLog("AUTO_WAITLIST", `Jogador ${player.name} movido para lista de espera por alterar horário para ${newTime} (atraso > 30m).`, "Sistema");
+        } 
+        // Se não ficou atrasado, só atualiza o tempo (já feito na linha player.arrivalEstimate = newTime)
     
-    p = newWaitlist.find(p => p.userId === playerId);
-    if (p) p.arrivalEstimate = newTime;
+    } else if (waitlistIndex !== -1) {
+        // Está na lista de espera, só atualiza o tempo
+        newWaitlist[waitlistIndex].arrivalEstimate = newTime;
+        // Teoricamente, se ele antecipar o horário e houver vaga, poderia subir, 
+        // mas vamos manter simples por enquanto conforme solicitado.
+    }
 
     await updateDoc(sessionRef, { players: newPlayers, waitlist: newWaitlist });
   },

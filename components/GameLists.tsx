@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameSession, User, ListPlayer } from '../types';
 import { db } from '../lib/api'; // Mudança aqui
-import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock } from 'lucide-react';
+import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock, Save } from 'lucide-react';
 
 // --- Helper Functions ---
 const parseDate = (dateStr: string) => {
@@ -78,6 +78,39 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     const [tempTime, setTempTime] = useState("");
     const [timeToGuests, setTimeToGuests] = useState<string | null>(null);
 
+    // Edit Session State
+    const [isEditingSession, setIsEditingSession] = useState(false);
+    const [editData, setEditData] = useState({
+        name: session.name,
+        date: session.date,
+        time: session.time,
+        maxSpots: session.maxSpots,
+        guestDate: '',
+        guestTime: ''
+    });
+
+    // Inicializa campos de data de convidado na edição
+    useEffect(() => {
+        if(isEditingSession) {
+             const guestDateObj = new Date(session.guestWindowOpenTime);
+             // Ajuste básico para pegar YYYY-MM-DD e HH:MM local
+             const y = guestDateObj.getFullYear();
+             const m = String(guestDateObj.getMonth() + 1).padStart(2, '0');
+             const d = String(guestDateObj.getDate()).padStart(2, '0');
+             const hh = String(guestDateObj.getHours()).padStart(2, '0');
+             const mm = String(guestDateObj.getMinutes()).padStart(2, '0');
+             
+             setEditData({
+                 name: session.name,
+                 date: session.date,
+                 time: session.time,
+                 maxSpots: session.maxSpots,
+                 guestDate: `${y}-${m}-${d}`,
+                 guestTime: `${hh}:${mm}`
+             });
+        }
+    }, [isEditingSession, session]);
+
     const isPlayerIn = session.players.some(p => p.userId === currentUser.uid);
     const isWaitlisted = session.waitlist.some(p => p.userId === currentUser.uid);
     const hasGuest = session.players.some(p => p.linkedTo === currentUser.uid) || session.waitlist.some(p => p.linkedTo === currentUser.uid);
@@ -153,6 +186,28 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             onRefresh();
         } catch (e: any) { console.error(e.message); }
     };
+    
+    const handleSaveSessionEdit = async () => {
+        setLoading(true);
+        try {
+            const guestWindowOpenTime = new Date(`${editData.guestDate}T${editData.guestTime}`).getTime();
+            if (isNaN(guestWindowOpenTime)) throw new Error("Data de convidado inválida");
+
+            await db.updateSession(session.id, {
+                name: editData.name,
+                date: editData.date,
+                time: editData.time,
+                maxSpots: editData.maxSpots,
+                guestWindowOpenTime
+            });
+            setIsEditingSession(false);
+            onRefresh();
+        } catch (e: any) {
+            alert("Erro ao atualizar: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const getInviterName = (id: string) => {
         const u = allUsers.find(user => user.uid === id);
@@ -209,22 +264,69 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             <div className="bg-white dark:bg-slate-800 w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 
                 <div className="bg-yellow-400 text-slate-900 p-4 relative shrink-0">
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-yellow-500/50 hover:bg-yellow-500 rounded-full text-slate-900 transition-colors">
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-yellow-500/50 hover:bg-yellow-500 rounded-full text-slate-900 transition-colors z-10">
                         <X size={20} />
                     </button>
-                    <div className="pr-12">
-                        <h2 className="text-xl font-black leading-tight mb-1 tracking-tight">{session.name}</h2>
-                        <div className="flex flex-wrap gap-4 text-slate-800 text-sm font-medium">
-                            <div className="flex items-center gap-1.5">
-                                <Calendar size={14} className="text-slate-900"/>
-                                <span className="capitalize">{getDayOfWeek(session.date)}, {formatTime(session.date, session.time)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <Clock size={14} className="text-slate-900"/>
-                                <span>Início: {session.time}</span>
+                    
+                    {isAdmin && !isEditingSession && (
+                         <button onClick={() => setIsEditingSession(true)} className="absolute top-4 right-14 p-2 bg-yellow-500/50 hover:bg-yellow-500 rounded-full text-slate-900 transition-colors z-10">
+                            <Edit3 size={20} />
+                        </button>
+                    )}
+
+                    {!isEditingSession ? (
+                        <div className="pr-12">
+                            <h2 className="text-xl font-black leading-tight mb-1 tracking-tight">{session.name}</h2>
+                            <div className="flex flex-wrap gap-4 text-slate-800 text-sm font-medium">
+                                <div className="flex items-center gap-1.5">
+                                    <Calendar size={14} className="text-slate-900"/>
+                                    <span className="capitalize">{getDayOfWeek(session.date)}, {formatTime(session.date, session.time)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <Clock size={14} className="text-slate-900"/>
+                                    <span>Início: {session.time}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="pr-12 space-y-2">
+                             <input value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} 
+                                className="w-full p-1 rounded text-sm bg-yellow-100 border-none text-slate-900 font-bold placeholder-yellow-700/50 focus:ring-2 focus:ring-white" placeholder="Nome do Local" />
+                             
+                             <div className="grid grid-cols-2 gap-2">
+                                <input type="date" value={editData.date} onChange={e => setEditData({...editData, date: e.target.value})} 
+                                    className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                <input type="time" value={editData.time} onChange={e => setEditData({...editData, time: e.target.value})} 
+                                    className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                             </div>
+
+                             <div className="grid grid-cols-2 gap-2">
+                                 <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-800">Convidados</label>
+                                    <div className="flex gap-1">
+                                        <input type="date" value={editData.guestDate} onChange={e => setEditData({...editData, guestDate: e.target.value})} 
+                                            className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                        <input type="time" value={editData.guestTime} onChange={e => setEditData({...editData, guestTime: e.target.value})} 
+                                            className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                    </div>
+                                 </div>
+                                 <div>
+                                     <label className="text-[10px] uppercase font-bold text-slate-800">Vagas</label>
+                                     <input type="number" value={editData.maxSpots} onChange={e => setEditData({...editData, maxSpots: Number(e.target.value)})} 
+                                        className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                 </div>
+                             </div>
+
+                             <div className="flex gap-2 mt-2">
+                                 <button onClick={handleSaveSessionEdit} disabled={loading} className="bg-slate-900 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                     <Save size={12}/> Salvar
+                                 </button>
+                                 <button onClick={() => setIsEditingSession(false)} className="bg-yellow-500 text-slate-900 px-3 py-1 rounded text-xs font-bold">
+                                     Cancelar
+                                 </button>
+                             </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 px-4 py-2 flex justify-between items-center shrink-0">
@@ -274,11 +376,11 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                             <TimePicker value={joinTime} onChange={setJoinTime} />
                                         </div>
                                         <button onClick={handleJoin} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
-                                            {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Fila' : 'CONFIRMAR')}
+                                            {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Lista de Espera' : 'CONFIRMAR')}
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1">
-                                        <AlertCircle size={10}/> Atraso  30min = Fila de espera automática.
+                                        <AlertCircle size={10}/> Atraso  30min = Lista de espera automática.
                                     </p>
                                 </div>
                             ) : (
@@ -336,7 +438,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                     {session.waitlist.length > 0 && (
                         <div className="mt-6">
                             <h3 className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                Fila de Espera ({session.waitlist.length})
+                                Lista de Espera ({session.waitlist.length})
                             </h3>
                              <div className="bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-100 dark:border-orange-900/20 overflow-hidden">
                                 {session.waitlist.map((p, i) => renderListRow(p, i, true))}
