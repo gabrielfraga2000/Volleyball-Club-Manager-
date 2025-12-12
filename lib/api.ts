@@ -16,7 +16,7 @@ import {
   signInWithEmailAndPassword, 
   signOut 
 } from "firebase/auth";
-import { db, auth } from "./firebase";
+import { db as firestore, auth } from "./firebase"; // Importado como 'firestore' para não conflitar com o export 'db' abaixo
 import { User, GameSession, ListPlayer, SystemLog } from '../types';
 
 // --- Local Cache for Synchronous Reads ---
@@ -27,15 +27,15 @@ let localLogsCache: SystemLog[] = [];
 
 // --- Listeners de Tempo Real ---
 // Inicia assim que o arquivo é importado para manter o cache atualizado
-const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+const unsubUsers = onSnapshot(collection(firestore, "users"), (snapshot) => {
   localUsersCache = snapshot.docs.map(doc => doc.data() as User);
 });
 
-const unsubSessions = onSnapshot(query(collection(db, "sessions"), orderBy("date", "asc")), (snapshot) => {
+const unsubSessions = onSnapshot(query(collection(firestore, "sessions"), orderBy("date", "asc")), (snapshot) => {
   localSessionsCache = snapshot.docs.map(doc => doc.data() as GameSession);
 });
 
-const unsubLogs = onSnapshot(query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(200)), (snapshot) => {
+const unsubLogs = onSnapshot(query(collection(firestore, "logs"), orderBy("timestamp", "desc"), limit(200)), (snapshot) => {
   localLogsCache = snapshot.docs.map(doc => doc.data() as SystemLog);
 });
 
@@ -61,7 +61,7 @@ export const db = {
       authorName
     };
     // Grava no Firestore
-    await setDoc(doc(db, "logs", newLog.id), newLog);
+    await setDoc(doc(firestore, "logs", newLog.id), newLog);
   },
 
   // --- Auth Methods ---
@@ -71,7 +71,7 @@ export const db = {
     const firebaseUser = userCredential.user;
 
     // 2. Buscar dados adicionais no Firestore (role, stats, etc)
-    const userDocRef = doc(db, "users", firebaseUser.uid);
+    const userDocRef = doc(firestore, "users", firebaseUser.uid);
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
@@ -109,7 +109,7 @@ export const db = {
       createdAt: Date.now()
     };
 
-    await setDoc(doc(db, "users", firebaseUser.uid), newUser);
+    await setDoc(doc(firestore, "users", firebaseUser.uid), newUser);
     await this.addLog("REGISTER", `Novo usuário registrado: ${newUser.fullName} (${newUser.email})`);
     
     localStorage.setItem('vg_auth_user_v2', JSON.stringify(newUser));
@@ -133,7 +133,7 @@ export const db = {
   },
 
   async updateProfile(uid: string, data: Partial<User>) {
-    const userRef = doc(db, "users", uid);
+    const userRef = doc(firestore, "users", uid);
     await updateDoc(userRef, data);
 
     // Atualiza storage local se for o próprio usuário
@@ -149,7 +149,7 @@ export const db = {
       if (!user) return;
       
       const oldRole = user.role;
-      const userRef = doc(db, "users", uid);
+      const userRef = doc(firestore, "users", uid);
       await updateDoc(userRef, { role: newRole });
 
       await this.addLog("ROLE_CHANGE", `Usuário ${user.fullName} alterado de ${oldRole} para ${newRole}`, "Sistema");
@@ -177,7 +177,7 @@ export const db = {
   async createSession(sessionData: Omit<GameSession, 'id' | 'players' | 'waitlist' | 'status'>) {
     // Cria ID manualmente ou deixa o Firestore criar.
     // Para manter consistência com sua tipagem que exige 'id', vamos criar um ref.
-    const newSessionRef = doc(collection(db, "sessions"));
+    const newSessionRef = doc(collection(firestore, "sessions"));
     
     const newSession: GameSession = {
       ...sessionData,
@@ -192,7 +192,7 @@ export const db = {
   },
 
   async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any) {
-    const sessionRef = doc(db, "sessions", sessionId);
+    const sessionRef = doc(firestore, "sessions", sessionId);
     const sessionDoc = await getDoc(sessionRef);
     
     if (!sessionDoc.exists()) throw new Error("Sessão não encontrada.");
@@ -245,7 +245,7 @@ export const db = {
   },
 
   async leaveSession(sessionId: string, userId: string) {
-    const sessionRef = doc(db, "sessions", sessionId);
+    const sessionRef = doc(firestore, "sessions", sessionId);
     const sessionDoc = await getDoc(sessionRef);
     if (!sessionDoc.exists()) throw new Error("Sessão não encontrada");
     
@@ -289,12 +289,12 @@ export const db = {
   },
 
   async deleteSession(sessionId: string) {
-      await deleteDoc(doc(db, "sessions", sessionId));
+      await deleteDoc(doc(firestore, "sessions", sessionId));
       await this.addLog("DELETE_SESSION", `Sessão ${sessionId} cancelada.`);
   },
 
   async updatePlayerArrival(sessionId: string, playerId: string, newTime: string) {
-    const sessionRef = doc(db, "sessions", sessionId);
+    const sessionRef = doc(firestore, "sessions", sessionId);
     const session = localSessionsCache.find(s => s.id === sessionId); // Use cache for quick lookup
     if (!session) return;
 
@@ -312,7 +312,7 @@ export const db = {
   },
 
   async togglePlayerAttendance(sessionId: string, playerId: string, status: boolean) {
-      const sessionRef = doc(db, "sessions", sessionId);
+      const sessionRef = doc(firestore, "sessions", sessionId);
       const session = localSessionsCache.find(s => s.id === sessionId);
       if (!session) return;
 
@@ -328,7 +328,7 @@ export const db = {
       if (player && !player.isGuest) {
           const user = localUsersCache.find(u => u.uid === playerId);
           if (user) {
-             const userRef = doc(db, "users", playerId);
+             const userRef = doc(firestore, "users", playerId);
              const newAttended = status ? user.stats.gamesAttended + 1 : Math.max(0, user.stats.gamesAttended - 1);
              await updateDoc(userRef, { "stats.gamesAttended": newAttended });
           }
@@ -337,7 +337,7 @@ export const db = {
 
   // --- Notification Methods ---
   async addNotification(userId: string, message: string) {
-      const userRef = doc(db, "users", userId);
+      const userRef = doc(firestore, "users", userId);
       const user = localUsersCache.find(u => u.uid === userId);
       if (!user) return;
 
@@ -353,7 +353,7 @@ export const db = {
   },
 
   async markNotificationsRead(userId: string) {
-      const userRef = doc(db, "users", userId);
+      const userRef = doc(firestore, "users", userId);
       const user = localUsersCache.find(u => u.uid === userId);
       if (!user) return;
 
@@ -362,7 +362,7 @@ export const db = {
   },
 
   async clearNotifications(userId: string) {
-      const userRef = doc(db, "users", userId);
+      const userRef = doc(firestore, "users", userId);
       await updateDoc(userRef, { notifications: [] });
   }
 };
