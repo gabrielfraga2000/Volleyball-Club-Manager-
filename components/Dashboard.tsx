@@ -28,14 +28,16 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
   const isAdminOrDev = liveUser.role === 2 || liveUser.role === 3;
   const isDev = liveUser.role === 3;
 
-  const loadData = useCallback(() => {
-    setSessions(db.getSessions());
-    setAllUsers(db.getUsers());
+  const loadData = useCallback(async () => {
+    // We use the refreshData method to sync and get fresh data
+    const { sessions: s, users: u } = await db.refreshData();
+    setSessions(s);
+    setAllUsers(u);
   }, []);
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 2000);
+    const interval = setInterval(loadData, 3000); // Polling every 3s
     return () => clearInterval(interval);
   }, [loadData]);
 

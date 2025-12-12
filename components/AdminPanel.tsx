@@ -73,19 +73,24 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const isAdminOrDev = currentUser.role === 2 || currentUser.role === 3;
 
   useEffect(() => {
-    setUsers(db.getUsers());
-    setLogs(db.getLogs());
-    setAllSessions(db.getSessions());
+    refreshData();
   }, []);
 
-  const refreshData = () => {
-    setUsers(db.getUsers());
-    setLogs(db.getLogs());
-    setAllSessions(db.getSessions());
+  const refreshData = async () => {
+    // We use the synchronous getters from db, but they rely on cache which needs to be refreshed.
+    // However, Dashboard refreshes the cache every 3s.
+    // For AdminPanel, let's force a refresh.
+    const { users: u, sessions: s } = await db.refreshData();
+    setUsers(u);
+    setAllSessions(s);
     
+    // Logs are separate
+    const l = await db.getLogs();
+    setLogs(l);
+
     // Refresh inspected user if open
     if (inspectUser) {
-        const updated = db.getUsers().find(u => u.uid === inspectUser.uid);
+        const updated = u.find(u => u.uid === inspectUser.uid);
         if (updated) setInspectUser(updated);
     }
   }
