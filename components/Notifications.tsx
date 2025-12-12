@@ -1,26 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { User, AppNotification } from '../types';
-import { db } from '../lib/mockFirebase';
+import { db } from '../lib/api'; // Mudança aqui
 import { Bell, Trash2, CheckCircle } from 'lucide-react';
 
 export default function Notifications({ user }: { user: User }) {
   const [list, setList] = useState<AppNotification[]>(user.notifications || []);
 
-  // Sync state with props (when polling updates the user object in parent)
   useEffect(() => {
     setList(user.notifications || []);
     
-    // Auto-mark as read if there are unread items and the component is mounted (tab is open)
     if (user.notifications?.some(n => !n.read)) {
         db.markNotificationsRead(user.uid);
     }
   }, [user.notifications, user.uid]);
 
   const handleClear = async () => {
-    // Optimistic update
     setList([]);
     await db.clearNotifications(user.uid);
-    // No reload needed, parent polling will sync eventually, and local state is already empty.
   };
 
   return (

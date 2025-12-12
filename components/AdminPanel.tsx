@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/mockFirebase';
+import { db } from '../lib/api'; // Mudança aqui
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
 import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 
-// --- TimePicker Component (Shared Logic) ---
 const TimePicker = ({ value, onChange, className = "" }: { value: string, onChange: (v: string) => void, className?: string }) => {
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
     const minutes = ['00', '10', '20', '30', '40', '50'];
-    
-    // Ensure value is HH:MM
     const [h, m] = (value && value.includes(':')) ? value.split(':') : ['', ''];
 
     const update = (newH: string, newM: string) => {
@@ -52,13 +49,9 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const [allSessions, setAllSessions] = useState<GameSession[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'create' | 'logs' | 'guests' | 'matches'>('create');
   
-  // Inspect Modal State
   const [inspectUser, setInspectUser] = useState<User | null>(null);
-
-  // Match History Expand State
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
-  // Changed guestDelayMinutes to specific date/time for guest window
   const [newList, setNewList] = useState({ 
     name: '', 
     date: '', 
@@ -76,21 +69,13 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
     refreshData();
   }, []);
 
-  const refreshData = async () => {
-    // We use the synchronous getters from db, but they rely on cache which needs to be refreshed.
-    // However, Dashboard refreshes the cache every 3s.
-    // For AdminPanel, let's force a refresh.
-    const { users: u, sessions: s } = await db.refreshData();
-    setUsers(u);
-    setAllSessions(s);
+  const refreshData = () => {
+    setUsers(db.getUsers());
+    setLogs(db.getLogs());
+    setAllSessions(db.getSessions());
     
-    // Logs are separate
-    const l = await db.getLogs();
-    setLogs(l);
-
-    // Refresh inspected user if open
     if (inspectUser) {
-        const updated = u.find(u => u.uid === inspectUser.uid);
+        const updated = db.getUsers().find(u => u.uid === inspectUser.uid);
         if (updated) setInspectUser(updated);
     }
   }
@@ -113,10 +98,8 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         return;
     }
     
-    // Create timestamp from specific date and time inputs
     const guestWindowOpenTime = new Date(`${newList.guestDate}T${newList.guestTime}`).getTime();
     
-    // Check if guest time is valid
     if (isNaN(guestWindowOpenTime)) {
         alert("Por favor, preencha a data e hora de abertura para convidados corretamente.");
         return;
@@ -137,9 +120,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   };
 
   const toggleRole = async (uid: string, currentRole: number) => {
-    // Only Dev can touch Admin(2) or Dev(3) roles usually, but for prototype:
-    // User(1) <-> Pending(0) is standard admin.
-    // If dev, can toggle to admin.
     if (!isDev && currentRole >= 2) return; 
 
     const newRole = currentRole === 0 ? 1 : (currentRole === 1 ? 0 : 0);
@@ -173,7 +153,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
     refreshData();
   };
 
-  // Helper to extract unique guests from all sessions
   const getGuestHistory = () => {
     const guestMap = new Map<string, {name: string, inviterId: string, sessions: number}>();
     
@@ -181,7 +160,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         const allPlayers = [...session.players, ...session.waitlist];
         allPlayers.forEach(p => {
             if (p.isGuest && p.linkedTo) {
-                // Key: name + inviterId (assuming guest identity is tied to inviter)
                 const key = `${p.name}-${p.linkedTo}`;
                 if (!guestMap.has(key)) {
                     guestMap.set(key, { name: p.name, inviterId: p.linkedTo, sessions: 0 });
@@ -199,7 +177,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       return u ? (u.nickname || u.fullName) : 'Desconhecido';
   };
 
-  // Convert ddmmaaaa to yyyy-mm-dd for input date value
   const formatDobForInput = (dob: string) => {
     if (!dob || dob.length !== 8) return '';
     const d = dob.slice(0, 2);
@@ -226,7 +203,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         Painel do {isDev ? 'DEV' : 'ADEMIRO'}
       </h2>
 
-      {/* Admin Sub-Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
         <button 
           onClick={() => setActiveSubTab('create')}
@@ -242,7 +218,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
           Jogadores
         </button>
 
-        {/* Matches Tab */}
         {isAdminOrDev && (
             <button 
             onClick={() => setActiveSubTab('matches')}
@@ -269,7 +244,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         )}
       </div>
       
-      {/* Create List */}
       {activeSubTab === 'create' && (
         <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
           <h3 className="font-bold text-slate-900 dark:text-white mb-4">Nova Lista</h3>
@@ -311,7 +285,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </div>
       )}
 
-      {/* MATCH HISTORY TAB */}
       {activeSubTab === 'matches' && isAdminOrDev && (
         <div className="space-y-4 animate-fade-in">
             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -379,7 +352,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </div>
       )}
 
-      {/* ALL Users List (Jogadores) */}
       {activeSubTab === 'users' && (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
           <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({users.length})</h3>
@@ -393,11 +365,9 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                       {u.role === 2 && <span className="ml-2 text-[10px] bg-slate-800 text-yellow-400 px-1 rounded">ADEMIRO</span>}
                       {u.role === 3 && <span className="ml-2 text-[10px] bg-indigo-900 text-white px-1 rounded">DEV</span>}
                   </div>
-                  {/* Changed Email to Phone as requested, now with Formatting */}
                   <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{formatPhone(u.phone)}</div>
                 </div>
 
-                {/* Games Counter Column */}
                 <div className="mx-2 text-center w-16">
                      <div className="text-xs font-bold text-slate-800 dark:text-slate-300">{u.stats.gamesAttended}</div>
                      <div className="text-[9px] text-slate-400 uppercase">Jogos</div>
@@ -409,7 +379,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                         Aprovar
                         </button>
                     )}
-                    {/* Dev Only: Inspect Button */}
                     {isDev && (
                         <button onClick={() => setInspectUser(u)} className="p-2 bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-500 rounded transition-colors" title="Inspecionar">
                             <Eye size={16} />
@@ -422,7 +391,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </div>
       )}
 
-      {/* Guest History Tab */}
       {activeSubTab === 'guests' && (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UsersIcon size={16}/> Histórico de Convidados</h3>
@@ -446,7 +414,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </div>
       )}
 
-      {/* Logs View (Dev Only) */}
       {activeSubTab === 'logs' && isDev && (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
           <div className="flex justify-between items-center mb-4">
@@ -477,7 +444,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </div>
       )}
 
-      {/* DEV INSPECTOR MODAL */}
       {inspectUser && isDev && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -506,7 +472,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Data Nasc.</label>
-                            {/* Converted text to date input as requested */}
                             <input 
                               type="date" 
                               disabled 

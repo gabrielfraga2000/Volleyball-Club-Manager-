@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './lib/mockFirebase';
+import { db } from './lib/api'; // Mudança aqui
 import { User } from './types';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import { Moon, Sun } from 'lucide-react';
 
-// --- Theme Toggle Component ---
 const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Check local storage or system preference on mount
     const savedTheme = localStorage.getItem('vg_theme');
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       setIsDark(true);
@@ -51,7 +49,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
     const user = db.getCurrentUser();
     if (user) {
       setCurrentUser(user);

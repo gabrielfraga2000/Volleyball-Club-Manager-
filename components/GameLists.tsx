@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameSession, User, ListPlayer } from '../types';
-import { db } from '../lib/mockFirebase';
+import { db } from '../lib/api'; // Mudança aqui
 import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock } from 'lucide-react';
 
 // --- Helper Functions ---
@@ -17,12 +17,9 @@ const getDayOfWeek = (isoDate: string) => {
     return days[d.getDay()];
 };
 
-// --- TimePicker Component (Custom 10-min interval) ---
 const TimePicker = ({ value, onChange, className = "", compact = false }: { value: string, onChange: (v: string) => void, className?: string, compact?: boolean }) => {
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
     const minutes = ['00', '10', '20', '30', '40', '50'];
-    
-    // Ensure value is HH:MM
     const [h, m] = (value && value.includes(':')) ? value.split(':') : ['', ''];
 
     const update = (newH: string, newM: string) => {
@@ -62,22 +59,15 @@ interface ModalProps {
     allUsers: User[];
 }
 
-// --- MODAL COMPONENT (A "Nova Janela") ---
 const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose, onRefresh, allUsers }) => {
     const [activeTab, setActiveTab] = useState<'main' | 'guests'>('main');
     const [showGuestForm, setShowGuestForm] = useState(false);
     const [guestData, setGuestData] = useState({ name: '', surname: '', email: '', phone: '', arrivalTime: session.time });
     const [joinTime, setJoinTime] = useState(session.time);
     const [loading, setLoading] = useState(false);
-    
-    // Success Feedback State
     const [joinSuccess, setJoinSuccess] = useState(false);
-    
-    // Edit Time State
     const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
     const [tempTime, setTempTime] = useState("");
-
-    // Guest Timer State
     const [timeToGuests, setTimeToGuests] = useState<string | null>(null);
 
     const isPlayerIn = session.players.some(p => p.userId === currentUser.uid);
@@ -87,7 +77,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     const isFull = session.players.length >= session.maxSpots;
     const guestWindowOpen = Date.now() >= session.guestWindowOpenTime;
 
-    // --- Timer Effect ---
     useEffect(() => {
         const updateTimer = () => {
             const now = Date.now();
@@ -98,7 +87,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                 return;
             }
 
-            // Calculate hours, minutes, seconds
             const h = Math.floor(diff / (1000 * 60 * 60));
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const s = Math.floor((diff % (1000 * 60)) / 1000);
@@ -106,12 +94,11 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             setTimeToGuests(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
         };
 
-        updateTimer(); // Run immediately
+        updateTimer();
         const interval = setInterval(updateTimer, 1000);
         return () => clearInterval(interval);
     }, [session.guestWindowOpenTime]);
 
-    // Handlers
     const handleJoin = async () => {
         if (!joinTime) return alert("Informe seu horário.");
         setLoading(true);
@@ -159,7 +146,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         } catch (e: any) { console.error(e.message); }
     };
 
-    // Renders
     const getInviterName = (id: string) => {
         const u = allUsers.find(user => user.uid === id);
         return u ? (u.nickname || u.fullName) : '???';
@@ -188,7 +174,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                              </span>
                         )}
                     </div>
-                    {/* Time Display/Edit */}
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Chegada:</span>
                         {isEditing ? (
@@ -215,7 +200,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-white dark:bg-slate-800 w-full max-w-lg max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                 
-                {/* Header Modal - Yellow/Black */}
                 <div className="bg-yellow-400 text-slate-900 p-4 relative shrink-0">
                     <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-yellow-500/50 hover:bg-yellow-500 rounded-full text-slate-900 transition-colors">
                         <X size={20} />
@@ -235,7 +219,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                     </div>
                 </div>
 
-                {/* Status Bar & Timer */}
                 <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 px-4 py-2 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2">
                         <Users size={16} className="text-slate-400"/>
@@ -244,7 +227,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         </span>
                     </div>
 
-                    {/* GUEST TIMER DISPLAY */}
                     <div className="flex items-center gap-1.5">
                         {timeToGuests ? (
                             <>
@@ -263,10 +245,8 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                     </div>
                 </div>
 
-                {/* Scrollable List Area */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-800 p-4 transition-colors">
                     
-                    {/* User Action Area */}
                     <div className="mb-6 transition-all duration-300">
                         {joinSuccess ? (
                             <div className="bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-400 p-6 rounded-xl flex flex-col items-center justify-center animate-fade-in text-center shadow-inner">
@@ -310,7 +290,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             )
                         )}
 
-                        {/* Guest Form */}
                         {showGuestForm && !joinSuccess && (
                              <div className="mt-3 bg-slate-50 dark:bg-slate-700 p-3 rounded-xl border border-slate-200 dark:border-slate-600 animate-fade-in">
                                 <p className="text-xs font-bold text-slate-800 dark:text-white mb-2">Dados do Convidado</p>
@@ -333,7 +312,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         )}
                     </div>
 
-                    {/* Main List */}
                     <div>
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                             Lista Principal ({session.players.length})
@@ -347,7 +325,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         </div>
                     </div>
 
-                    {/* Waitlist */}
                     {session.waitlist.length > 0 && (
                         <div className="mt-6">
                             <h3 className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -364,7 +341,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     );
 }
 
-// --- SUMMARY CARD (O Gatilho) ---
 interface SessionSummaryCardProps {
     session: GameSession;
     onClick: () => void;
@@ -378,10 +354,8 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
     
     return (
         <div onClick={onClick} className="group bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-yellow-300 dark:hover:border-yellow-500 transition-all cursor-pointer relative overflow-hidden">
-            {/* Status Stripe */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 ${isFull ? 'bg-orange-500' : 'bg-green-500'}`}></div>
             
-            {/* Delete Button (Overlay) - Only if canDelete */}
             {canDelete && onDelete && (
                 <button 
                     onClick={(e) => onDelete(session.id, e)}
@@ -419,7 +393,6 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
                     </div>
                 </div>
 
-                {/* Progress Bar Visual */}
                 <div className="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div 
                         className={`h-full rounded-full transition-all duration-500 ${isFull ? 'bg-orange-400' : 'bg-green-500'}`} 

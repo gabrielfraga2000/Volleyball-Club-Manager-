@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, GameSession } from '../types';
-import { db } from '../lib/mockFirebase';
+import { db } from '../lib/api'; // Mudança aqui
 import GameLists from './GameLists';
 import AdminPanel from './AdminPanel';
 import Notifications from './Notifications';
@@ -16,28 +16,24 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   
-  // Find the most up-to-date version of the current user from the polled list
   const liveUser = allUsers.find(u => u.uid === initialUser.uid) || initialUser;
   
-  // Profile Edit State
   const [nickname, setNickname] = useState(liveUser.nickname || liveUser.fullName);
   const [savingProfile, setSavingProfile] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  // Role 2 is Admin. Role 3 is Dev.
   const isAdminOrDev = liveUser.role === 2 || liveUser.role === 3;
   const isDev = liveUser.role === 3;
 
-  const loadData = useCallback(async () => {
-    // We use the refreshData method to sync and get fresh data
-    const { sessions: s, users: u } = await db.refreshData();
-    setSessions(s);
-    setAllUsers(u);
+  const loadData = useCallback(() => {
+    // Agora usando o cache sincronizado do Firestore
+    setSessions(db.getSessions());
+    setAllUsers(db.getUsers());
   }, []);
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 3000); // Polling every 3s
+    const interval = setInterval(loadData, 2000); // Polling continua para atualizar o React com o cache do Firestore
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -45,7 +41,6 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
     setSavingProfile(true);
     try {
         await db.updateProfile(liveUser.uid, { nickname });
-        // Force refresh is handled by next interval or simple alert for now
     } catch (e: any) {
         alert("Erro ao salvar perfil");
     } finally {
@@ -53,7 +48,6 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
     }
   };
 
-  // Count unread notifications using live data
   const unreadCount = liveUser.notifications?.filter(n => !n.read).length || 0;
 
   if (liveUser.role === 0) {
@@ -74,7 +68,6 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
   return (
     <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
       
-      {/* Top Navigation - Yellow/Black Theme */}
       <div className="bg-white dark:bg-slate-800 border-b border-yellow-200 dark:border-yellow-500/30 px-4 py-3 flex justify-between items-center sticky top-0 z-30 transition-colors">
         <h1 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2 tracking-tight uppercase">
           {!imgError ? (
@@ -101,10 +94,8 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto pb-20">
         
-        {/* TAB: PROFILE */}
         {activeTab === 'profile' && (
           <div className="p-4 space-y-4">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center transition-colors">
@@ -155,15 +146,12 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
           </div>
         )}
 
-        {/* TAB: LISTS */}
         {activeTab === 'lists' && (
           <div className="p-4 space-y-4">
-            {/* Pass allUsers to allow guest mapping to nicknames */}
             <GameLists sessions={sessions} currentUser={liveUser} onRefresh={loadData} allUsers={allUsers} />
           </div>
         )}
 
-        {/* TAB: NOTIFICATIONS */}
         {activeTab === 'notifications' && (
           <div className="p-4 h-full">
              <Notifications user={liveUser} />
@@ -172,7 +160,6 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
 
       </div>
 
-      {/* Bottom Tab Bar */}
       <div className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-around p-2 pb-safe fixed bottom-0 left-0 right-0 z-40 transition-colors">
         <button 
           onClick={() => setActiveTab('lists')}
