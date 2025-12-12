@@ -3,6 +3,7 @@ import express from 'express';
 import sqlite3 from 'sqlite3';
 import cors from 'cors';
 import { open } from 'sqlite';
+import fs from 'fs';
 
 const app = express();
 const PORT = 3001;
@@ -10,48 +11,26 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// --- Initial Data Seed ---
-const SEED_USER = {
-  uid: "user-1765497156842",
-  fullName: "Gabriel Fraga",
-  nickname: "Gabriel",
-  email: "gabriel.fraga2000@gmail.com",
-  phone: "22998910728",
-  dob: "09072000",
-  gender: "M",
-  role: 3, // Dev/Admin
-  stats: { gamesAttended: 0, gamesMissed: 0 },
-  donations: [],
-  notifications: [],
-  createdAt: 1765497156842
-};
-
-const SEED_SESSION = {
-    id: 'session-default-1212',
-    name: 'Vôlei de Quinta',
-    date: '2025-12-12',
-    time: '19:00',
-    guestWindowOpenTime: 0,
-    maxSpots: 18,
-    players: [],
-    waitlist: [],
-    createdBy: 'system',
-    status: 'open'
-};
-
 let db;
 
-// Initialize DB and Start Server
-(async () => {
+// Função para iniciar conexão
+async function initServer() {
+  const dbFile = './database.sqlite';
+  
+  // Verifica se o arquivo existe
+  if (!fs.existsSync(dbFile)) {
+      console.log("⚠️ Arquivo database.sqlite não encontrado. Criando automaticamente...");
+      // Se não existir, a gente roda o open que cria vazio, e o código abaixo cria as tabelas.
+      // Mas recomendamos rodar npm run db:init para garantir os dados iniciais.
+  }
+
   try {
     db = await open({
-      filename: './database.sqlite',
+      filename: dbFile,
       driver: sqlite3.Database
     });
 
-    console.log('Database connected.');
-
-    // Create Tables
+    // Garante tabelas (caso o usuário não tenha rodado o init_db)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         uid TEXT PRIMARY KEY,
@@ -71,33 +50,19 @@ let db;
       );
     `);
 
-    // --- SEED DATA ---
-    
-    // Check and Insert User
-    const userExists = await db.get('SELECT uid FROM users WHERE uid = ?', SEED_USER.uid);
-    if (!userExists) {
-        await db.run('INSERT INTO users (uid, email, data) VALUES (?, ?, ?)', 
-            SEED_USER.uid, SEED_USER.email, JSON.stringify(SEED_USER));
-        console.log('Seed: Usuário Gabriel criado.');
-    }
+    console.log('✅ Conectado ao SQLite.');
 
-    // Check and Insert Session
-    const sessionExists = await db.get('SELECT id FROM sessions WHERE id = ?', SEED_SESSION.id);
-    if (!sessionExists) {
-        await db.run('INSERT INTO sessions (id, date, time, data) VALUES (?, ?, ?, ?)', 
-            SEED_SESSION.id, SEED_SESSION.date, SEED_SESSION.time, JSON.stringify(SEED_SESSION));
-        console.log('Seed: Sessão 12/12 criada.');
-    }
-
-    // Start Server only AFTER DB is ready
     app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
 
   } catch (e) {
-    console.error('Failed to start server:', e);
+    console.error('❌ Falha ao iniciar servidor:', e);
+    process.exit(1);
   }
-})();
+}
+
+initServer();
 
 // --- Routes ---
 
