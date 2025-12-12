@@ -76,23 +76,39 @@ export const db = {
 
   // --- Auth Methods ---
   async login(email: string, passwordDOB: string): Promise<User> {
-    // 1. Login no Firebase Auth
-    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), passwordDOB);
-    const firebaseUser = userCredential.user;
-
-    // 2. Buscar dados adicionais no Firestore (role, stats, etc)
-    const userDocRef = doc(firestore, "users", firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-      throw new Error("Usuário autenticado, mas dados de perfil não encontrados.");
+    // Check local cache first to distinguish "Email not found" vs "Wrong password"
+    // Note: This relies on the cache being populated. If cache is empty, it falls back to Firebase generic error.
+    const userExists = localUsersCache.some(u => u.email === email.trim());
+    
+    if (localUsersCache.length > 0 && !userExists) {
+        throw new Error("Este email não possui cadastro.");
     }
 
-    const userData = userDoc.data() as User;
-    
-    // Salva no localStorage apenas para persistência de sessão rápida no frontend
-    localStorage.setItem('vg_auth_user_v2', JSON.stringify(userData));
-    return userData;
+    try {
+        // 1. Login no Firebase Auth
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), passwordDOB);
+        const firebaseUser = userCredential.user;
+
+        // 2. Buscar dados adicionais no Firestore (role, stats, etc)
+        const userDocRef = doc(firestore, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+            throw new Error("Usuário autenticado, mas dados de perfil não encontrados.");
+        }
+
+        const userData = userDoc.data() as User;
+        
+        // Salva no localStorage apenas para persistência de sessão rápida no frontend
+        localStorage.setItem('vg_auth_user_v2', JSON.stringify(userData));
+        return userData;
+    } catch (error: any) {
+        // Se falhar no Firebase e o usuário existia no cache (ou cache vazio), provavelmente é senha
+        if (userExists || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+             throw new Error("Senha incorreta. Verifique sua data de nascimento.");
+        }
+        throw error;
+    }
   },
 
   async register(data: Omit<User, 'uid' | 'role' | 'stats' | 'donations' | 'notifications' | 'createdAt'>): Promise<User> {
@@ -226,6 +242,12 @@ export const db = {
       const sessionRef = doc(firestore, "sessions", sessionId);
       await updateDoc(sessionRef, data);
       await this.addLog("UPDATE_SESSION", `Sessão ${sessionId} atualizada.`);
+  },
+  
+  async closeSession(sessionId: string) {
+      const sessionRef = doc(firestore, "sessions", sessionId);
+      await updateDoc(sessionRef, { status: 'closed' });
+      await this.addLog("CLOSE_SESSION", `Sessão ${sessionId} finalizada.`);
   },
 
   async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any) {
@@ -398,21 +420,55 @@ export const db = {
       const session = localSessionsCache.find(s => s.id === sessionId);
       if (!session) return;
 
+      const playerInMain = session.players.find(p => p.userId === playerId);
+      // Jogadores na espera também podem ter presença marcada? Vamos assumir que sim, para histórico.
+      const playerInWait = session.waitlist.find(p => p.userId === playerId);
+      
+      const player = playerInMain || playerInWait;
+
+      if (!player) return;
+
+      const wasPresent = !!player.attended;
+      const isNowPresent = status;
+
+      // Se nada mudou, ignora
+      if (wasPresent === isNowPresent) return;
+
       const newPlayers = session.players.map(p => {
           if (p.userId === playerId) return { ...p, attended: status };
           return p;
       });
+      const newWaitlist = session.waitlist.map(p => {
+          if (p.userId === playerId) return { ...p, attended: status };
+          return p;
+      });
 
-      await updateDoc(sessionRef, { players: newPlayers });
+      await updateDoc(sessionRef, { players: newPlayers, waitlist: newWaitlist });
 
-      // Update User Stats
-      const player = session.players.find(p => p.userId === playerId);
-      if (player && !player.isGuest) {
+      // Atualiza Stats do Usuário (Se não for convidado)
+      if (!player.isGuest) {
           const user = localUsersCache.find(u => u.uid === playerId);
           if (user) {
              const userRef = doc(firestore, "users", playerId);
-             const newAttended = status ? user.stats.gamesAttended + 1 : Math.max(0, user.stats.gamesAttended - 1);
-             await updateDoc(userRef, { "stats.gamesAttended": newAttended });
+             
+             let newAttended = user.stats.gamesAttended;
+             let newMissed = user.stats.gamesMissed;
+
+             if (isNowPresent) {
+                 // Marcou como presente
+                 newAttended++;
+                 // Se ele estava contado como ausente antes (e tinha pontos de falta), reduzimos a falta
+                 if (!wasPresent && newMissed > 0) newMissed--;
+             } else {
+                 // Desmarcou presença (marcou como ausente)
+                 newAttended = Math.max(0, newAttended - 1);
+                 newMissed++;
+             }
+
+             await updateDoc(userRef, { 
+                 "stats.gamesAttended": newAttended,
+                 "stats.gamesMissed": newMissed
+             });
           }
       }
   },

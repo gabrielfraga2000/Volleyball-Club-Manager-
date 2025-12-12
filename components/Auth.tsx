@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/api'; // Mudança aqui
 import { User } from '../types';
 import { Trophy, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
@@ -28,6 +28,11 @@ export default function Auth({ onSuccess }: AuthProps) {
   
   const [dobParts, setDobParts] = useState({ d: '', m: '', y: '' });
 
+  // Refs para auto-focus
+  const dayRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     setRegData(prev => ({
         ...prev,
@@ -43,10 +48,8 @@ export default function Auth({ onSuccess }: AuthProps) {
       const user = await db.login(email, dobPassword);
       onSuccess(user);
     } catch (err: any) {
-      // Firebase error messages are ugly, let's clean them up slightly
-      let msg = err.message;
-      if(msg.includes('auth/invalid-credential')) msg = "Email ou senha incorretos.";
-      setError(msg);
+      // Usa a mensagem direta da API que já trata os casos específicos
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -89,6 +92,14 @@ export default function Auth({ onSuccess }: AuthProps) {
   const handleDatePartChange = (part: 'd' | 'm' | 'y', val: string) => {
       const numbersOnly = val.replace(/\D/g, '');
       setDobParts(prev => ({ ...prev, [part]: numbersOnly }));
+
+      // Lógica de Auto-Focus
+      if (part === 'd' && numbersOnly.length === 2) {
+          monthRef.current?.focus();
+      }
+      if (part === 'm' && numbersOnly.length === 2) {
+          yearRef.current?.focus();
+      }
   };
 
   return (
@@ -145,8 +156,17 @@ export default function Auth({ onSuccess }: AuthProps) {
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Senha (Nasc: ddmmaaaa)</label>
-                    <input required type="password" maxLength={8} value={dobPassword} onChange={e => setDobPassword(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" placeholder="01012000" />
+                    <input 
+                        required 
+                        type="password" 
+                        inputMode="numeric" 
+                        pattern="[0-9]*"
+                        maxLength={8} 
+                        value={dobPassword} 
+                        onChange={e => setDobPassword(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        placeholder="01012000" 
+                    />
                 </div>
                 <button disabled={loading} className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 font-black py-3 rounded-lg mt-2 transition-all active:scale-[0.98] shadow-md hover:shadow-lg disabled:opacity-70">
                     {loading ? 'Autenticando...' : 'ACESSAR'}
@@ -165,8 +185,14 @@ export default function Auth({ onSuccess }: AuthProps) {
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Celular / WhatsApp (Apenas Números)</label>
                     <span className="text-[10px] text-slate-400">{regData.phone.length}/11</span>
                 </div>
-                <input required type="tel" placeholder="22999999999" value={regData.phone} onChange={handlePhoneChange}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
+                <input 
+                    required 
+                    type="tel" 
+                    placeholder="22999999999" 
+                    value={regData.phone} 
+                    onChange={handlePhoneChange}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
@@ -177,12 +203,39 @@ export default function Auth({ onSuccess }: AuthProps) {
                  <div className="col-span-2">
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nascimento</label>
                     <div className="flex gap-2">
-                        <input required type="text" maxLength={2} placeholder="DD" value={dobParts.d} onChange={e => handleDatePartChange('d', e.target.value)}
-                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
-                        <input required type="text" maxLength={2} placeholder="MM" value={dobParts.m} onChange={e => handleDatePartChange('m', e.target.value)}
-                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
-                        <input required type="text" maxLength={4} placeholder="AAAA" value={dobParts.y} onChange={e => handleDatePartChange('y', e.target.value)}
-                            className="flex-[1.5] min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" />
+                        <input 
+                            required 
+                            ref={dayRef}
+                            type="text" 
+                            inputMode="numeric"
+                            maxLength={2} 
+                            placeholder="DD" 
+                            value={dobParts.d} 
+                            onChange={e => handleDatePartChange('d', e.target.value)}
+                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
+                        <input 
+                            required 
+                            ref={monthRef}
+                            type="text" 
+                            inputMode="numeric"
+                            maxLength={2} 
+                            placeholder="MM" 
+                            value={dobParts.m} 
+                            onChange={e => handleDatePartChange('m', e.target.value)}
+                            className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
+                        <input 
+                            required 
+                            ref={yearRef}
+                            type="text" 
+                            inputMode="numeric"
+                            maxLength={4} 
+                            placeholder="AAAA" 
+                            value={dobParts.y} 
+                            onChange={e => handleDatePartChange('y', e.target.value)}
+                            className="flex-[1.5] min-w-0 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-yellow-400 outline-none transition-colors" 
+                        />
                     </div>
                  </div>
                  <div className="col-span-1">
