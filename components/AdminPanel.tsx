@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/api'; // Mudança aqui
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
-import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus } from 'lucide-react';
 
 const TimePicker = ({ value, onChange, className = "" }: { value: string, onChange: (v: string) => void, className?: string }) => {
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
@@ -47,7 +47,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [allSessions, setAllSessions] = useState<GameSession[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'create' | 'logs' | 'guests' | 'matches'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'create' | 'logs' | 'guests' | 'matches' | 'pending'>('create');
   
   const [inspectUser, setInspectUser] = useState<User | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
@@ -197,10 +197,12 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       return phone;
   };
 
+  const pendingUsers = users.filter(u => u.role === 0);
+
   return (
     <div className="space-y-6 mt-8 border-t border-slate-200 dark:border-slate-700 pt-8 relative transition-colors">
       <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-        Painel do {isDev ? 'DEV' : 'ADEMIRO'}
+        Painel
       </h2>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
@@ -234,12 +236,19 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
           Convidados
         </button>
         
+        <button 
+           onClick={() => setActiveSubTab('pending')}
+           className={`px-3 py-1 text-xs font-bold rounded-full flex items-center gap-1 ${activeSubTab === 'pending' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
+        >
+          Aprovações {pendingUsers.length > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px]">{pendingUsers.length}</span>}
+        </button>
+
         {isDev && (
             <button 
             onClick={() => { setActiveSubTab('logs'); refreshData(); }}
             className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'logs' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
             >
-            Logs / Auditoria
+            Logs
             </button>
         )}
       </div>
@@ -385,6 +394,32 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                         </button>
                     )}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'pending' && (
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <UserPlus size={16}/> Pendentes de Aprovação ({pendingUsers.length})
+          </h3>
+          <div className="space-y-2 h-64 overflow-y-auto custom-scrollbar">
+            {pendingUsers.length === 0 && <p className="text-slate-400 text-sm text-center py-10">Tudo limpo! Ninguém esperando aprovação.</p>}
+            {pendingUsers.map(u => (
+              <div key={u.uid} className="flex justify-between items-center p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded border border-yellow-100 dark:border-yellow-900/20">
+                <div className="flex-1 overflow-hidden mr-2">
+                  <div className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
+                      {u.fullName}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{formatPhone(u.phone)}</div>
+                  <div className="text-[10px] text-slate-400">Criado em: {new Date(u.createdAt).toLocaleDateString()}</div>
+                </div>
+
+                <button onClick={() => toggleRole(u.uid, u.role)} className="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 shadow-sm transition-all active:scale-95">
+                    APROVAR
+                </button>
               </div>
             ))}
           </div>

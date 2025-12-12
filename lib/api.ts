@@ -112,13 +112,13 @@ export const db = {
     const newUser: User = {
       ...safeData,
       uid: firebaseUser.uid, // Usa o UID real do Firebase Auth
-      role: 1, 
+      role: 0, // MUDANÇA: Começa como 0 (Pendente) para exigir aprovação
       stats: { gamesAttended: 0, gamesMissed: 0 },
       donations: [],
       notifications: [
         {
             id: 'welcome-' + Date.now(),
-            message: "Bem-vindo ao Manhãzinha! Sua conta foi criada.",
+            message: "Bem-vindo ao Manhãzinha! Sua conta foi criada e está aguardando aprovação.",
             date: Date.now(),
             read: false
         }
@@ -176,7 +176,7 @@ export const db = {
       // Notification Logic
       let notifMsg = "";
       if (newRole === 1 && oldRole === 0) {
-          notifMsg = "🎉 Sua conta foi aprovada!";
+          notifMsg = "🎉 Sua conta foi aprovada! Agora você pode entrar nos jogos.";
       } else if (newRole === 2) {
           notifMsg = "🛡️ Você foi promovido a Ademiro!";
       } else if (newRole === 0) {
@@ -230,14 +230,16 @@ export const db = {
     const isLate = arrivalMinutes > (startMinutes + 30);
     const isFull = session.players.length >= session.maxSpots;
 
-    const listPlayer: ListPlayer = {
+    // CORREÇÃO CRÍTICA: Firestore não aceita 'undefined'. Usamos 'null' explicitamente.
+    // Usamos 'any' temporariamente aqui se a interface ListPlayer for estrita, mas o Firestore exige null.
+    const listPlayer: any = {
         userId: userIdToCheck,
         name: isGuest ? (guestData?.name + ' ' + (guestData?.surname || '')) : (user.nickname || user.fullName),
         isGuest,
-        linkedTo: isGuest ? user.uid : undefined,
+        linkedTo: isGuest ? user.uid : null, // MUDANÇA: undefined -> null
         joinedAt: Date.now(),
         arrivalEstimate: arrivalTime,
-        guestContact: isGuest ? guestData : undefined
+        guestContact: isGuest ? guestData : null // MUDANÇA: undefined -> null
     };
 
     const updates: any = {};
