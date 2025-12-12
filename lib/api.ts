@@ -27,17 +27,22 @@ let localLogsCache: SystemLog[] = [];
 
 // --- Listeners de Tempo Real ---
 // Inicia assim que o arquivo é importado para manter o cache atualizado
-const unsubUsers = onSnapshot(collection(firestore, "users"), (snapshot) => {
-  localUsersCache = snapshot.docs.map(doc => doc.data() as User);
-});
+// Usamos try-catch nos listeners para evitar crash se as permissões ainda não estiverem propagadas
+try {
+  onSnapshot(collection(firestore, "users"), (snapshot) => {
+    localUsersCache = snapshot.docs.map(doc => doc.data() as User);
+  });
 
-const unsubSessions = onSnapshot(query(collection(firestore, "sessions"), orderBy("date", "asc")), (snapshot) => {
-  localSessionsCache = snapshot.docs.map(doc => doc.data() as GameSession);
-});
+  onSnapshot(query(collection(firestore, "sessions"), orderBy("date", "asc")), (snapshot) => {
+    localSessionsCache = snapshot.docs.map(doc => doc.data() as GameSession);
+  });
 
-const unsubLogs = onSnapshot(query(collection(firestore, "logs"), orderBy("timestamp", "desc"), limit(200)), (snapshot) => {
-  localLogsCache = snapshot.docs.map(doc => doc.data() as SystemLog);
-});
+  onSnapshot(query(collection(firestore, "logs"), orderBy("timestamp", "desc"), limit(200)), (snapshot) => {
+    localLogsCache = snapshot.docs.map(doc => doc.data() as SystemLog);
+  });
+} catch (error) {
+  console.warn("Erro ao iniciar listeners do Firestore (pode ser permissão):", error);
+}
 
 // --- Helper Functions ---
 const getMinutes = (timeStr: string | undefined) => {
@@ -53,21 +58,26 @@ export const db = {
   },
 
   async addLog(action: string, details: string, authorName?: string) {
-    const newLog: SystemLog = {
-      id: 'log-' + Date.now() + Math.random(),
-      timestamp: Date.now(),
-      action,
-      details,
-      authorName
-    };
-    // Grava no Firestore
-    await setDoc(doc(firestore, "logs", newLog.id), newLog);
+    // Blindagem: Logs não devem quebrar a aplicação principal
+    try {
+        const newLog: SystemLog = {
+          id: 'log-' + Date.now() + Math.random(),
+          timestamp: Date.now(),
+          action,
+          details,
+          authorName
+        };
+        // Grava no Firestore
+        await setDoc(doc(firestore, "logs", newLog.id), newLog);
+    } catch (e) {
+        console.warn(`[Log Falhou - Não Crítico] ${action}:`, e);
+    }
   },
 
   // --- Auth Methods ---
   async login(email: string, passwordDOB: string): Promise<User> {
     // 1. Login no Firebase Auth
-    const userCredential = await signInWithEmailAndPassword(auth, email, passwordDOB);
+    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), passwordDOB);
     const firebaseUser = userCredential.user;
 
     // 2. Buscar dados adicionais no Firestore (role, stats, etc)
@@ -86,14 +96,21 @@ export const db = {
   },
 
   async register(data: Omit<User, 'uid' | 'role' | 'stats' | 'donations' | 'notifications' | 'createdAt'>): Promise<User> {
+    // Sanitização para evitar problemas com espaços extras em nomes compostos
+    const safeData = {
+        ...data,
+        fullName: data.fullName.trim(),
+        email: data.email.trim()
+    };
+
     // 1. Criar Auth User
     // A senha será a data de nascimento (dob) conforme sua lógica
-    const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.dob);
+    const userCredential = await createUserWithEmailAndPassword(auth, safeData.email, safeData.dob);
     const firebaseUser = userCredential.user;
 
     // 2. Criar Documento no Firestore
     const newUser: User = {
-      ...data,
+      ...safeData,
       uid: firebaseUser.uid, // Usa o UID real do Firebase Auth
       role: 1, 
       stats: { gamesAttended: 0, gamesMissed: 0 },
@@ -110,6 +127,8 @@ export const db = {
     };
 
     await setDoc(doc(firestore, "users", firebaseUser.uid), newUser);
+    
+    // O log agora é seguro e não lança erro para cima se falhar
     await this.addLog("REGISTER", `Novo usuário registrado: ${newUser.fullName} (${newUser.email})`);
     
     localStorage.setItem('vg_auth_user_v2', JSON.stringify(newUser));
