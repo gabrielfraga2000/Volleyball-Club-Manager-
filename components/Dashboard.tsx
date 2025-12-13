@@ -116,7 +116,7 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
         <h1 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2 tracking-tight uppercase">
           {!imgError ? (
             <img 
-              src="/mascote.png" 
+              src="public/mascote.png" 
               alt="Logo" 
               className="w-8 h-8 object-contain"
               onError={() => setImgError(true)}

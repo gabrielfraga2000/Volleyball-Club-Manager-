@@ -292,15 +292,15 @@ export const db = {
     return localSessionsCache;
   },
   
-  // Função para verificar sessões expiradas (> 5 horas)
+  // Função para verificar sessões expiradas (> 4 horas)
   async checkAndCloseExpiredSessions() {
       const now = Date.now();
-      const expirationMs = 5 * 60 * 60 * 1000; // 5 hours
+      const expirationMs = 4 * 60 * 60 * 1000; // 4 hours
       
       const sessionsToClose = localSessionsCache.filter(s => {
           if (s.status === 'closed') return false;
           const sessionStart = new Date(`${s.date}T${s.time}`).getTime();
-          // Se já passou 5 horas do início
+          // Se já passou 4 horas do início
           return (now - sessionStart) > expirationMs;
       });
 
@@ -312,13 +312,13 @@ export const db = {
       for (const session of sessionsToClose) {
           await this.closeSession(session.id);
           
-          const msg = `⚠️ O jogo '${session.name}' foi encerrado automaticamente (5h+). Por favor, atualize a lista de presença.`;
+          const msg = `⚠️ O jogo '${session.name}' foi encerrado automaticamente (4h+). Por favor, atualize a lista de presença.`;
           
           for (const admin of admins) {
               await this.addNotification(admin.uid, msg);
           }
           
-          await this.addLog("AUTO_CLOSE", `Sessão ${session.name} encerrada automaticamente por tempo excedido. Admins notificados.`, "Sistema");
+          await this.addLog("AUTO_CLOSE", `Sessão ${session.name} encerrada automaticamente por tempo excedido (4h). Admins notificados.`, "Sistema");
       }
   },
 

@@ -165,18 +165,81 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
           );
       });
 
-  // Filtro de Sessões (Histórico/Futuro misturados na aba de Admin, mas ordenados por data)
-  const filteredSessions = allSessions
-      .filter(s => {
-          if (!matchDateFilter) return true;
-          return s.date === matchDateFilter;
-      })
+  // Filtro de Sessões: APENAS FINALIZADAS (Histórico)
+  const baseSessions = allSessions.filter(s => {
+      if (!matchDateFilter) return true;
+      return s.date === matchDateFilter;
+  });
+
+  const closedSessions = baseSessions
+      .filter(s => s.status === 'closed')
       .sort((a,b) => {
-          // Ordena do mais recente para o mais antigo (Decrescente)
           const dateA = new Date(`${a.date}T${a.time}`).getTime();
           const dateB = new Date(`${b.date}T${b.time}`).getTime();
-          return dateB - dateA; 
+          return dateB - dateA; // Decrescente (Mais recente primeiro)
       });
+
+  const renderSessionCard = (session: GameSession) => (
+      <div key={session.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-colors">
+            <div 
+                onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
+                className="p-3 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+                <div>
+                    <div className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-2">
+                        {session.name} 
+                        <span className="text-[10px] text-slate-400 font-normal border border-slate-300 dark:border-slate-600 rounded px-1">{session.type}</span>
+                        {session.status === 'closed' && <span className="text-[10px] bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 rounded-full font-bold">FINALIZADA</span>}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {parseDate(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
+                    </div>
+                </div>
+                {expandedSession === session.id ? <ChevronUp size={16} className="text-slate-400"/> : <ChevronDown size={16} className="text-slate-400"/>}
+            </div>
+
+            {expandedSession === session.id && (
+                <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Lista Principal</p>
+                        {session.players.length === 0 && <p className="text-xs text-slate-300 italic">Vazia</p>}
+                        {session.players.map(p => (
+                            <div key={p.userId} className="flex justify-between items-center py-1 border-b border-slate-50 dark:border-slate-700 last:border-0">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${p.attended ? 'bg-green-500' : 'bg-red-200 dark:bg-red-900'}`}></div>
+                                    <span className={`text-sm ${p.attended ? 'text-slate-800 dark:text-slate-200 font-medium' : 'text-slate-500 dark:text-slate-500'}`}>
+                                        {p.name} {p.isGuest && <span className="text-[10px] text-indigo-500 dark:text-indigo-400">(Convidado)</span>}
+                                        {p.arrivalEstimate && <span className="text-[10px] text-slate-400 ml-1">@{p.arrivalEstimate}</span>}
+                                    </span>
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold">{p.attended ? 'Presente' : 'Ausente'}</span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={!!p.attended} 
+                                        onChange={() => handleToggleAttendance(session.id, p.userId, !!p.attended)}
+                                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                                    />
+                                </label>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {session.waitlist.length > 0 && (
+                        <div className="mt-4 space-y-1">
+                                <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Lista de Espera / Torcida</p>
+                                {session.waitlist.map(p => (
+                                <div key={p.userId} className="flex justify-between items-center py-1">
+                                    <span className="text-sm text-orange-800/60 dark:text-orange-300/60">{p.name}</span>
+                                    <span className="text-[10px] text-slate-300">Em espera</span>
+                                </div>
+                                ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+  );
 
   return (
     <div className="space-y-6 pt-4 relative transition-colors h-full flex flex-col">
@@ -206,7 +269,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
             onClick={() => setActiveSubTab('matches')}
             className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'matches' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
             >
-            Partidas
+            Histórico e Presença
             </button>
         )}
 
@@ -236,8 +299,8 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
       {activeSubTab === 'matches' && isAdminOrDev && (
-        <div className="space-y-4 animate-fade-in">
-            <div className="flex justify-between items-end mb-2">
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-end">
                 <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                     <Calendar size={18}/> Histórico e Presença
                 </h3>
@@ -259,73 +322,15 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                 </div>
             </div>
 
-            {filteredSessions.length === 0 && (
+            {closedSessions.length === 0 && (
                 <p className="text-slate-400 text-sm text-center py-8">
-                    {matchDateFilter ? "Nenhuma partida encontrada nesta data." : "Nenhuma sessão registrada."}
+                    {matchDateFilter ? "Nenhuma partida finalizada nesta data." : "Nenhum histórico de partidas."}
                 </p>
             )}
             
-            {filteredSessions.map(session => (
-                <div key={session.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-colors">
-                    <div 
-                        onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
-                        className="p-3 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-2">
-                                {session.name} 
-                                <span className="text-[10px] text-slate-400 font-normal border border-slate-300 dark:border-slate-600 rounded px-1">{session.type}</span>
-                                {session.status === 'closed' && <span className="text-[10px] bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 rounded-full font-bold">FINALIZADA</span>}
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                {parseDate(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
-                            </div>
-                        </div>
-                        {expandedSession === session.id ? <ChevronUp size={16} className="text-slate-400"/> : <ChevronDown size={16} className="text-slate-400"/>}
-                    </div>
-
-                    {expandedSession === session.id && (
-                        <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Lista Principal</p>
-                                {session.players.length === 0 && <p className="text-xs text-slate-300 italic">Vazia</p>}
-                                {session.players.map(p => (
-                                    <div key={p.userId} className="flex justify-between items-center py-1 border-b border-slate-50 dark:border-slate-700 last:border-0">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${p.attended ? 'bg-green-500' : 'bg-red-200 dark:bg-red-900'}`}></div>
-                                            <span className={`text-sm ${p.attended ? 'text-slate-800 dark:text-slate-200 font-medium' : 'text-slate-500 dark:text-slate-500'}`}>
-                                                {p.name} {p.isGuest && <span className="text-[10px] text-indigo-500 dark:text-indigo-400">(Convidado)</span>}
-                                                {p.arrivalEstimate && <span className="text-[10px] text-slate-400 ml-1">@{p.arrivalEstimate}</span>}
-                                            </span>
-                                        </div>
-                                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold">{p.attended ? 'Presente' : 'Ausente'}</span>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={!!p.attended} 
-                                                onChange={() => handleToggleAttendance(session.id, p.userId, !!p.attended)}
-                                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                                            />
-                                        </label>
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            {session.waitlist.length > 0 && (
-                                <div className="mt-4 space-y-1">
-                                     <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Lista de Espera / Torcida</p>
-                                     {session.waitlist.map(p => (
-                                        <div key={p.userId} className="flex justify-between items-center py-1">
-                                            <span className="text-sm text-orange-800/60 dark:text-orange-300/60">{p.name}</span>
-                                            <span className="text-[10px] text-slate-300">Em espera</span>
-                                        </div>
-                                     ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            ))}
+            <div className="space-y-3">
+                {closedSessions.map(renderSessionCard)}
+            </div>
         </div>
       )}
 

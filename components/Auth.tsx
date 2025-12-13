@@ -139,7 +139,7 @@ export default function Auth({ onSuccess }: AuthProps) {
           <div className="bg-white p-4 rounded-full shadow-lg mb-4 border-4 border-slate-900 overflow-hidden">
             {!imgError ? (
                 <img 
-                    src="/mascote.png"
+                    src="/public/mascote.png"
                     alt="Manhãzinha Mascote" 
                     className="w-24 h-24 object-contain" 
                     onError={() => setImgError(true)}
