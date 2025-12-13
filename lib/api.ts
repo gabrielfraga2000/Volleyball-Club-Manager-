@@ -358,14 +358,7 @@ export const db = {
         throw new Error("Horário de chegada inválido.");
     }
 
-    const now = Date.now();
-    const sessionStart = new Date(`${session.date}T${session.time}`).getTime();
-    
-    // Lista abre 20 min antes
-    const twentyMinMs = 20 * 60 * 1000;
-    if (now < (sessionStart - twentyMinMs)) {
-        throw new Error("A lista só abre 20 minutos antes do horário do jogo.");
-    }
+    // REMOVIDO: A restrição de só entrar 20 min antes foi retirada para permitir inscrições antecipadas.
 
     // Validação de Chegada Tardia (> 4 horas)
     const startMinutesVal = getMinutes(session.time);
