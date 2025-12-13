@@ -100,6 +100,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
 
     // Edit Session State
     const [isEditingSession, setIsEditingSession] = useState(false);
+    // Inicializa com valores padrão se os campos novos não existirem
     const [editData, setEditData] = useState({
         name: session.name,
         date: session.date,
@@ -107,14 +108,15 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         maxSpots: session.maxSpots,
         guestDate: '',
         guestTime: '',
-        type: session.type,
-        genderRestriction: session.genderRestriction,
-        allowGuests: session.allowGuests
+        type: session.type || 'pelada', 
+        genderRestriction: session.genderRestriction || 'all',
+        allowGuests: session.allowGuests ?? true
     });
 
     useEffect(() => {
         if(isEditingSession) {
-             const guestDateObj = new Date(session.guestWindowOpenTime);
+             const safeGuestTime = session.guestWindowOpenTime || Date.now();
+             const guestDateObj = new Date(safeGuestTime);
              const y = guestDateObj.getFullYear();
              const m = String(guestDateObj.getMonth() + 1).padStart(2, '0');
              const d = String(guestDateObj.getDate()).padStart(2, '0');
@@ -128,9 +130,9 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                  maxSpots: session.maxSpots,
                  guestDate: `${y}-${m}-${d}`,
                  guestTime: `${hh}:${mm}`,
-                 type: session.type,
-                 genderRestriction: session.genderRestriction,
-                 allowGuests: session.allowGuests
+                 type: session.type || 'pelada',
+                 genderRestriction: session.genderRestriction || 'all',
+                 allowGuests: session.allowGuests ?? true
              });
         }
     }, [isEditingSession, session]);

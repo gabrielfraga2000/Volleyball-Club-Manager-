@@ -353,31 +353,38 @@ export const db = {
         if (session.type === 'campeonato') throw new Error("Campeonatos não permitem convidados.");
     }
     
-    // 3. Time Constraints Logic (Existing)
+    // 3. Time Constraints Logic (Updated to be purely math-based)
+    if (!arrivalTime || !arrivalTime.includes(':')) {
+        throw new Error("Horário de chegada inválido.");
+    }
+
     const now = Date.now();
     const sessionStart = new Date(`${session.date}T${session.time}`).getTime();
     
+    // Lista abre 20 min antes
     const twentyMinMs = 20 * 60 * 1000;
     if (now < (sessionStart - twentyMinMs)) {
         throw new Error("A lista só abre 20 minutos antes do horário do jogo.");
     }
 
-    const startH = parseInt(session.time.split(':')[0]);
-    const arrivalH = parseInt(arrivalTime.split(':')[0]);
+    // Validação de Chegada Tardia (> 4 horas)
+    const startMinutesVal = getMinutes(session.time);
+    const arrivalMinutesVal = getMinutes(arrivalTime);
     
-    let arrivalDate = new Date(`${session.date}T${arrivalTime}`);
-    if (arrivalH < startH && (startH - arrivalH) > 12) {
-        arrivalDate.setDate(arrivalDate.getDate() + 1);
-    }
-    
-    const timeDiff = arrivalDate.getTime() - sessionStart;
-    const fourHoursMs = 4 * 60 * 60 * 1000;
+    let diffMinutes = arrivalMinutesVal - startMinutesVal;
 
-    if (timeDiff > fourHoursMs) {
+    // Ajuste para virada de dia (Ex: Jogo 23h, Chegada 01h)
+    // Se a diferença for negativa e maior que 12h (720min), assume dia seguinte
+    if (diffMinutes < -720) {
+        diffMinutes += 1440; // +24h
+    }
+
+    // 4 horas = 240 minutos
+    if (diffMinutes > 240) {
         throw new Error("Não é permitido entrar na lista para chegar mais de 4 horas após o início.");
     }
 
-    // Validation Logic
+    // Validation Logic (Duplication)
     const userIdToCheck = isGuest ? `guest-${Date.now()}` : user.uid;
     if (!isGuest) {
         if (session.players.some(p => p.userId === user.uid) || session.waitlist.some(p => p.userId === user.uid)) {
@@ -385,13 +392,11 @@ export const db = {
         }
     }
 
-    const startMinutes = getMinutes(session.time);
-    const arrivalMinutes = getMinutes(arrivalTime);
-    
-    // Lógica de atraso: Só se aplica se NÃO for campeonato e NÃO for resenha
+    // Lógica de atraso (>30min): Só se aplica se NÃO for campeonato e NÃO for resenha
     let isLate = false;
     if (session.type !== 'campeonato' && session.type !== 'resenha') {
-        isLate = arrivalMinutes > (startMinutes + 30);
+        // Usa a mesma lógica de minutos
+        isLate = diffMinutes > 30;
     }
     
     const isFull = session.players.length >= session.maxSpots;
@@ -461,7 +466,12 @@ export const db = {
         while (session.players.length < session.maxSpots && session.waitlist.length > 0) {
             const candidateIndex = session.waitlist.findIndex(p => {
                 const arrMinutes = getMinutes(p.arrivalEstimate);
-                return arrMinutes <= (startMinutes + 30);
+                
+                // Lógica de minutos para promoção
+                let diff = arrMinutes - startMinutes;
+                if (diff < -720) diff += 1440;
+
+                return diff <= 30; // Elegível se atraso for <= 30 min
             });
             
             if (candidateIndex === -1) break; 
@@ -503,6 +513,9 @@ export const db = {
     const waitlistIndex = newWaitlist.findIndex(p => p.userId === playerId);
 
     const startMinutes = getMinutes(session.time);
+    const arrivalMinutes = getMinutes(newTime);
+    let diff = arrivalMinutes - startMinutes;
+    if (diff < -720) diff += 1440;
 
     // Se for Campeonato ou Resenha, APENAS atualiza o horário, não move ninguem.
     if (session.type === 'campeonato' || session.type === 'resenha') {
@@ -517,8 +530,7 @@ export const db = {
         const player = newPlayers[playerIndex];
         player.arrivalEstimate = newTime;
 
-        const arrivalMinutes = getMinutes(newTime);
-        const isLate = arrivalMinutes > (startMinutes + 30);
+        const isLate = diff > 30;
 
         if (isLate) {
             newPlayers.splice(playerIndex, 1);
@@ -526,8 +538,10 @@ export const db = {
             
             while (newPlayers.length < session.maxSpots && newWaitlist.length > 0) {
                 const candidateIndex = newWaitlist.findIndex(p => {
-                    const arrM = getMinutes(p.arrivalEstimate);
-                    return arrM <= (startMinutes + 30);
+                    const am = getMinutes(p.arrivalEstimate);
+                    let d = am - startMinutes;
+                    if (d < -720) d += 1440;
+                    return d <= 30;
                 });
                 
                 if (candidateIndex === -1) break;
@@ -542,8 +556,7 @@ export const db = {
         const player = newWaitlist[waitlistIndex];
         player.arrivalEstimate = newTime;
 
-        const arrivalMinutes = getMinutes(newTime);
-        const isLate = arrivalMinutes > (startMinutes + 30);
+        const isLate = diff > 30;
         const hasSpot = newPlayers.length < session.maxSpots;
 
         if (!isLate && hasSpot) {
