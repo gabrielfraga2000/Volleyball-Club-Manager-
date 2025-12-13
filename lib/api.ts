@@ -53,6 +53,32 @@ const getMinutes = (timeStr: string | undefined) => {
     return (h || 0) * 60 + (m || 0);
 };
 
+// Helper de validação de conflito de horário (1h 50min = 110 minutos)
+const validateSessionTimeConflict = (date: string, time: string, excludeSessionId?: string) => {
+    const newTimeMinutes = getMinutes(time);
+    const MIN_GAP_MINUTES = 110; // 1h 50min
+
+    const conflict = localSessionsCache.find(s => {
+        // Ignora a própria sessão se estiver editando
+        if (excludeSessionId && s.id === excludeSessionId) return false;
+        
+        // Ignora sessões em dias diferentes
+        if (s.date !== date) return false;
+
+        // Ignora sessões já finalizadas (closed), pois não estão "rolando"
+        if (s.status === 'closed') return false;
+
+        const existingTimeMinutes = getMinutes(s.time);
+        const diff = Math.abs(newTimeMinutes - existingTimeMinutes);
+
+        return diff < MIN_GAP_MINUTES;
+    });
+
+    if (conflict) {
+        throw new Error(`Conflito de horário! Já existe o jogo '${conflict.name}' às ${conflict.time}. É necessário um intervalo mínimo de 1h 50min entre partidas.`);
+    }
+};
+
 export const db = {
   // --- Logger Methods ---
   getLogs(): SystemLog[] {
@@ -266,16 +292,16 @@ export const db = {
     return localSessionsCache;
   },
   
-  // Função para verificar sessões expiradas (> 4 horas)
+  // Função para verificar sessões expiradas (> 5 horas)
   async checkAndCloseExpiredSessions() {
       const now = Date.now();
-      const fourHoursMs = 4 * 60 * 60 * 1000;
+      const expirationMs = 5 * 60 * 60 * 1000; // 5 hours
       
       const sessionsToClose = localSessionsCache.filter(s => {
           if (s.status === 'closed') return false;
           const sessionStart = new Date(`${s.date}T${s.time}`).getTime();
-          // Se já passou 4 horas do início
-          return (now - sessionStart) > fourHoursMs;
+          // Se já passou 5 horas do início
+          return (now - sessionStart) > expirationMs;
       });
 
       if (sessionsToClose.length === 0) return;
@@ -286,7 +312,7 @@ export const db = {
       for (const session of sessionsToClose) {
           await this.closeSession(session.id);
           
-          const msg = `⚠️ O jogo '${session.name}' foi encerrado automaticamente (4h+). Por favor, atualize a lista de presença.`;
+          const msg = `⚠️ O jogo '${session.name}' foi encerrado automaticamente (5h+). Por favor, atualize a lista de presença.`;
           
           for (const admin of admins) {
               await this.addNotification(admin.uid, msg);
@@ -297,6 +323,9 @@ export const db = {
   },
 
   async createSession(sessionData: Omit<GameSession, 'id' | 'players' | 'waitlist' | 'status'>) {
+    // Validação de Conflito de Horário (1h 50min)
+    validateSessionTimeConflict(sessionData.date, sessionData.time);
+
     // Cria ID manualmente ou deixa o Firestore criar.
     // Para manter consistência com sua tipagem que exige 'id', vamos criar um ref.
     const newSessionRef = doc(collection(firestore, "sessions"));
@@ -314,6 +343,16 @@ export const db = {
   },
   
   async updateSession(sessionId: string, data: Partial<GameSession>) {
+      const session = localSessionsCache.find(s => s.id === sessionId);
+      if (!session) throw new Error("Sessão não encontrada.");
+
+      // Se estiver atualizando Data ou Hora, valida conflito
+      if (data.date || data.time) {
+          const targetDate = data.date || session.date;
+          const targetTime = data.time || session.time;
+          validateSessionTimeConflict(targetDate, targetTime, sessionId);
+      }
+
       const sessionRef = doc(firestore, "sessions", sessionId);
       await updateDoc(sessionRef, data);
       await this.addLog("UPDATE_SESSION", `Sessão ${sessionId} atualizada.`);

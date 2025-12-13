@@ -73,6 +73,27 @@ export default function Auth({ onSuccess }: AuthProps) {
       setLoading(false);
       return;
     }
+
+    // Validate Age (16+)
+    const day = parseInt(regData.dob.slice(0, 2));
+    const month = parseInt(regData.dob.slice(2, 4)) - 1; // Months are 0-indexed
+    const year = parseInt(regData.dob.slice(4, 8));
+    
+    const birthDate = new Date(year, month, day);
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const mDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+
+    if (age < 16) {
+        setError("É necessário ter pelo menos 16 anos para se cadastrar.");
+        setLoading(false);
+        return;
+    }
     
     if (regData.phone.length !== 11) {
         setError("O telefone deve conter exatamente 11 números (DDD + Número).");
@@ -256,7 +277,7 @@ export default function Auth({ onSuccess }: AuthProps) {
                      </select>
                  </div>
               </div>
-              <p className="text-xs text-slate-500 mt-2">* Sua data de nascimento será sua senha.</p>
+              <p className="text-xs text-slate-500 mt-2">* Mínimo 16 anos. Data de nascimento será sua senha.</p>
               <button disabled={loading} className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 font-bold py-3 rounded-lg mt-4 transition-all active:scale-[0.98] disabled:opacity-70">
                 {loading ? 'Criando...' : 'Criar Conta'}
               </button>

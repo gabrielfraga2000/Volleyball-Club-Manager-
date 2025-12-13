@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/api'; // Mudança aqui
+import { db } from '../lib/api';
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
-import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus, RefreshCw, Save } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus, RefreshCw, Save, Search, Filter } from 'lucide-react';
 
 // Função auxiliar para data local para evitar problemas de UTC
 const parseDate = (dateStr: string) => {
@@ -20,6 +20,10 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   
   const [inspectUser, setInspectUser] = useState<User | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  
+  // Filtros
+  const [userSearch, setUserSearch] = useState("");
+  const [matchDateFilter, setMatchDateFilter] = useState("");
   
   // Estado para edição de nick no inspector
   const [tempNick, setTempNick] = useState("");
@@ -148,7 +152,31 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   };
 
   const pendingUsers = users.filter(u => u.role === 0);
-  const activeUsers = users.filter(u => u.role !== 0); // Filtra os pendentes da lista principal
+  
+  // Filtro de Usuários
+  const activeUsers = users
+      .filter(u => u.role !== 0)
+      .filter(u => {
+          if (!userSearch) return true;
+          const search = userSearch.toLowerCase();
+          return (
+              u.fullName.toLowerCase().includes(search) || 
+              (u.nickname && u.nickname.toLowerCase().includes(search))
+          );
+      });
+
+  // Filtro de Sessões (Histórico/Futuro misturados na aba de Admin, mas ordenados por data)
+  const filteredSessions = allSessions
+      .filter(s => {
+          if (!matchDateFilter) return true;
+          return s.date === matchDateFilter;
+      })
+      .sort((a,b) => {
+          // Ordena do mais recente para o mais antigo (Decrescente)
+          const dateA = new Date(`${a.date}T${a.time}`).getTime();
+          const dateB = new Date(`${b.date}T${b.time}`).getTime();
+          return dateB - dateA; 
+      });
 
   return (
     <div className="space-y-6 pt-4 relative transition-colors h-full flex flex-col">
@@ -209,20 +237,47 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
       {activeSubTab === 'matches' && isAdminOrDev && (
         <div className="space-y-4 animate-fade-in">
-            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Calendar size={18}/> Histórico e Presença
-            </h3>
-            {allSessions.length === 0 && <p className="text-slate-400 text-sm">Nenhuma sessão registrada.</p>}
+            <div className="flex justify-between items-end mb-2">
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <Calendar size={18}/> Histórico e Presença
+                </h3>
+                <div className="flex flex-col gap-1 items-end">
+                    <label className="text-[10px] uppercase font-bold text-slate-400">Filtrar Data</label>
+                    <div className="relative">
+                        <input 
+                            type="date" 
+                            value={matchDateFilter}
+                            onChange={(e) => setMatchDateFilter(e.target.value)}
+                            className="text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white outline-none focus:ring-1 focus:ring-yellow-400"
+                        />
+                        {matchDateFilter && (
+                             <button onClick={() => setMatchDateFilter("")} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5">
+                                 <X size={8} />
+                             </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {filteredSessions.length === 0 && (
+                <p className="text-slate-400 text-sm text-center py-8">
+                    {matchDateFilter ? "Nenhuma partida encontrada nesta data." : "Nenhuma sessão registrada."}
+                </p>
+            )}
             
-            {allSessions.map(session => (
+            {filteredSessions.map(session => (
                 <div key={session.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-colors">
                     <div 
                         onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
                         className="p-3 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                         <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-sm">{session.name} <span className="text-[10px] text-slate-400 font-normal ml-1 border border-slate-300 dark:border-slate-600 rounded px-1">{session.type}</span></div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                            <div className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-2">
+                                {session.name} 
+                                <span className="text-[10px] text-slate-400 font-normal border border-slate-300 dark:border-slate-600 rounded px-1">{session.type}</span>
+                                {session.status === 'closed' && <span className="text-[10px] bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 px-1.5 rounded-full font-bold">FINALIZADA</span>}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                 {parseDate(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
                             </div>
                         </div>
@@ -276,8 +331,22 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       {activeSubTab === 'users' && (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><UserIcon size={16}/> Nomes ({activeUsers.length})</h3>
+          <div className="flex justify-between items-end mb-4">
+             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><UserIcon size={16}/> Nomes ({activeUsers.length})</h3>
+             <div className="relative">
+                 <input 
+                    type="text" 
+                    placeholder="Buscar nome ou nick..." 
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="pl-8 pr-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-1 focus:ring-yellow-400 w-40 sm:w-56"
+                 />
+                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+             </div>
+          </div>
+
           <div className="space-y-2 h-64 overflow-y-auto custom-scrollbar">
+            {activeUsers.length === 0 && <p className="text-slate-400 text-center text-sm py-4">Nenhum usuário encontrado.</p>}
             {activeUsers.map(u => (
               <div key={u.uid} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-100 dark:border-slate-600">
                 <div className="flex-1 overflow-hidden mr-2">
