@@ -503,7 +503,8 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             ) : (
                                 !isPlayerIn && !isWaitlisted ? (
                                     <>
-                                        {!genderAllowed ? (
+                                        {/* Lógica de Exibição: Se for restrito E não for campeonato (onde torcida libera tudo), mostra erro */}
+                                        {(!genderAllowed && !isChampionship) ? (
                                             <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20 text-center">
                                                 <AlertCircle size={32} className="mx-auto text-red-400 mb-2"/>
                                                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Restrição de Gênero</h3>
@@ -522,7 +523,12 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                                     
                                                     {isChampionship ? (
                                                         <>
-                                                            <button onClick={() => handleJoin(false)} disabled={loading || isFull} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                                            <button 
+                                                                onClick={() => handleJoin(false)} 
+                                                                disabled={loading || isFull || !genderAllowed} 
+                                                                title={!genderAllowed ? 'Restrito por gênero' : ''}
+                                                                className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
                                                                 {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Lotado' : 'JOGAR')}
                                                             </button>
                                                             <button onClick={() => handleJoin(true)} disabled={loading} className="flex-1 bg-orange-400 hover:bg-orange-500 text-white font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
@@ -542,8 +548,9 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                                     </p>
                                                 )}
                                                 {isChampionship && (
-                                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1">
-                                                        <Info size={10}/> "Jogar" entra na lista principal. "Torcer" entra na Torcida.
+                                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex flex-col gap-1">
+                                                        <span className="flex items-center gap-1"><Info size={10}/> "Jogar" entra na lista principal. "Torcer" entra na Torcida.</span>
+                                                        {!genderAllowed && <span className="flex items-center gap-1 text-red-400"><X size={10}/> Vaga de jogador restrita ao gênero.</span>}
                                                     </p>
                                                 )}
                                             </div>
@@ -741,9 +748,17 @@ export default function GameLists({ sessions, currentUser, onRefresh, allUsers }
   };
   
   // Filtra sessões baseado no status
-  const upcomingSessions = sessions.filter(s => s.status === 'open');
+  // ORDENAÇÃO CRONOLÓGICA (Mais próximo primeiro)
+  const upcomingSessions = sessions
+    .filter(s => s.status === 'open')
+    .sort((a, b) => {
+        const dateA = new Date(`${a.date}T${a.time}`).getTime();
+        const dateB = new Date(`${b.date}T${b.time}`).getTime();
+        return dateA - dateB;
+    });
+
   const historySessions = sessions.filter(s => s.status === 'closed');
-  // Ordena histórico do mais recente para o mais antigo
+  // Ordena histórico do mais recente para o mais antigo (Decrescente)
   historySessions.sort((a,b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime());
 
   return (

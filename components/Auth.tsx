@@ -12,6 +12,7 @@ export default function Auth({ onSuccess }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [imgError, setImgError] = useState(false);
+  const [appTitle, setAppTitle] = useState("Manhãzinha");
 
   // Login State
   const [email, setEmail] = useState("");
@@ -32,6 +33,13 @@ export default function Auth({ onSuccess }: AuthProps) {
   const dayRef = useRef<HTMLInputElement>(null);
   const monthRef = useRef<HTMLInputElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Easter Egg: 1 em 50 chances (2%) de virar Terezinha
+    if (Math.random() < 0.02) {
+      setAppTitle("Terezinha");
+    }
+  }, []);
 
   useEffect(() => {
     setRegData(prev => ({
@@ -110,7 +118,7 @@ export default function Auth({ onSuccess }: AuthProps) {
           <div className="bg-white p-4 rounded-full shadow-lg mb-4 border-4 border-slate-900 overflow-hidden">
             {!imgError ? (
                 <img 
-                    src="/mascote.png"
+                    src="./mascote.png"
                     alt="Manhãzinha Mascote" 
                     className="w-24 h-24 object-contain" 
                     onError={() => setImgError(true)}
@@ -119,7 +127,7 @@ export default function Auth({ onSuccess }: AuthProps) {
                 <Sun size={64} className="text-yellow-500 fill-yellow-400" /> 
             )}
           </div>
-          <h1 className="text-3xl font-black tracking-tight uppercase">Manhãzinha</h1>
+          <h1 className="text-3xl font-black tracking-tight uppercase">{appTitle}</h1>
           <p className="text-slate-800 font-bold text-sm tracking-wide">Vôlei, Sol e Resenha</p>
         </div>
 

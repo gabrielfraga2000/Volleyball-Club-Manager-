@@ -151,10 +151,10 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const activeUsers = users.filter(u => u.role !== 0); // Filtra os pendentes da lista principal
 
   return (
-    <div className="space-y-6 mt-8 border-t border-slate-200 dark:border-slate-700 pt-8 relative transition-colors">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 pt-4 relative transition-colors h-full flex flex-col">
+      <div className="flex justify-between items-center shrink-0">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            Painel
+            Painel Administrativo
         </h2>
         <button 
             onClick={refreshData} 
@@ -165,7 +165,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2 shrink-0">
         <button 
            onClick={() => setActiveSubTab('users')}
            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
@@ -206,6 +206,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         )}
       </div>
 
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
       {activeSubTab === 'matches' && isAdminOrDev && (
         <div className="space-y-4 animate-fade-in">
             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -390,6 +391,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
           </div>
         </div>
       )}
+      </div>
 
       {inspectUser && isDev && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">

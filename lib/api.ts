@@ -433,6 +433,44 @@ export const db = {
     }
     
     await this.addLog("JOIN", logDetails, user.fullName);
+
+    // --- PROGRESS NOTIFICATION LOGIC ---
+    // Envia notificação para TODOS os usuários ativos quando atinge 50%, 75% ou 100%
+    const currentCount = session.players.length + (updates.players ? 1 : 0); // Considera o novo jogador se foi adicionado na main list
+    const max = session.maxSpots;
+    
+    let progressMsg = "";
+    if (currentCount === Math.ceil(max * 0.5)) {
+        progressMsg = `A lista ${session.name} chegou a 50% de lotação!`;
+    } else if (currentCount === Math.ceil(max * 0.75)) {
+         progressMsg = `A lista ${session.name} chegou a 75% de lotação!`;
+    } else if (currentCount === max) {
+         progressMsg = `A lista ${session.name} lotou (100%)!`;
+    }
+
+    if (progressMsg) {
+        // Pega todos os usuários ativos (role != 0) do cache
+        const allActiveUsers = localUsersCache.filter(u => u.role !== 0);
+
+        // Prepara batch de promises para não travar
+        const notifPromises = allActiveUsers.map(u => {
+            // Verifica se o usuário já está na lista (para personalizar mensagem)
+            // Se updates.players existe, o array atual ainda não tem o novo player, mas currentCount já considerou.
+            // Aqui verificamos no array antigo + o player atual
+            const isInside = session.players.some(p => p.userId === u.uid) || (u.uid === user.uid && !asSpectator && !isGuest && !isLate && !isFull);
+            
+            let finalMsg = progressMsg;
+            // Se não está na lista e ainda tem vaga, manda mensagem de urgência
+            if (!isInside && currentCount < max) {
+                 finalMsg = `Corre! 🏃 ${progressMsg} Garanta sua vaga!`;
+            }
+
+            return this.addNotification(u.uid, finalMsg);
+        });
+        
+        // Executa sem await para não bloquear o retorno da função joinSession
+        Promise.all(notifPromises).catch(err => console.error("Erro ao enviar broadcast de notificação:", err));
+    }
   },
 
   async leaveSession(sessionId: string, userId: string) {
