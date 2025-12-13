@@ -31,6 +31,8 @@ export interface User {
   uid: string;
   fullName: string;
   nickname?: string; // New field for display name
+  nicknameLastUpdated?: number; // Timestamp da última troca
+  nicknameChangeCount?: number; // Contador de trocas
   email: string;
   phone: string;
   dob: string; // Format ddmmyyyy for password logic
@@ -59,6 +61,9 @@ export interface ListPlayer {
   };
 }
 
+export type SessionType = 'pelada' | 'treino' | 'campeonato' | 'resenha';
+export type GenderRestriction = 'M' | 'F' | 'all';
+
 export interface GameSession {
   id: string;
   name: string;
@@ -70,6 +75,11 @@ export interface GameSession {
   waitlist: ListPlayer[];
   createdBy: string;
   status: 'open' | 'closed';
+  
+  // New Fields
+  type: SessionType;
+  genderRestriction: GenderRestriction;
+  allowGuests: boolean;
 }
 
 export interface AuthState {

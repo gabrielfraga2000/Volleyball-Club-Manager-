@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { GameSession, User, ListPlayer } from '../types';
 import { db } from '../lib/api'; // Mudança aqui
-import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock, Save, History, PlayCircle, StopCircle } from 'lucide-react';
+import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock, Save, History, PlayCircle, StopCircle, Trophy, Coffee, Dumbbell, Activity, UserX, Megaphone, Info } from 'lucide-react';
 
 // --- Helper Functions ---
 const parseDate = (dateStr: string) => {
-    // dateStr deve ser YYYY-MM-DD
     if (!dateStr) return new Date();
     const [y, m, d] = dateStr.split('-').map(Number);
-    // Cria data meio-dia para evitar problemas de timezone
     return new Date(y, m - 1, d, 12, 0, 0);
 };
 
@@ -25,11 +23,28 @@ const getDayOfWeek = (isoDate: string) => {
     return days[d.getDay()];
 };
 
-// Verifica se a partida já começou
 const hasSessionStarted = (session: GameSession) => {
     const sessionStart = new Date(`${session.date}T${session.time}`);
     return Date.now() >= sessionStart.getTime();
 }
+
+const getSessionTypeIcon = (type: string) => {
+    switch(type) {
+        case 'campeonato': return <Trophy size={14} className="text-yellow-600" />;
+        case 'treino': return <Dumbbell size={14} className="text-blue-500" />;
+        case 'resenha': return <Coffee size={14} className="text-orange-500" />;
+        default: return <Activity size={14} className="text-green-500" />; // Pelada
+    }
+};
+
+const getSessionTypeLabel = (type: string) => {
+    switch(type) {
+        case 'campeonato': return 'Campeonato';
+        case 'treino': return 'Treino';
+        case 'resenha': return 'Resenha';
+        default: return 'Pelada';
+    }
+};
 
 const TimePicker = ({ value, onChange, className = "", compact = false }: { value: string, onChange: (v: string) => void, className?: string, compact?: boolean }) => {
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
@@ -74,7 +89,6 @@ interface ModalProps {
 }
 
 const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose, onRefresh, allUsers }) => {
-    const [activeTab, setActiveTab] = useState<'main' | 'guests'>('main');
     const [showGuestForm, setShowGuestForm] = useState(false);
     const [guestData, setGuestData] = useState({ name: '', surname: '', email: '', phone: '', arrivalTime: session.time });
     const [joinTime, setJoinTime] = useState(session.time);
@@ -124,6 +138,13 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
     const isStarted = hasSessionStarted(session);
     const isClosed = session.status === 'closed';
 
+    // Logic checks
+    const genderAllowed = session.genderRestriction === 'all' || currentUser.gender === session.genderRestriction || currentUser.gender === 'O';
+    const isChampionship = session.type === 'campeonato';
+    const isResenha = session.type === 'resenha';
+    // Se for resenha, a lista de espera não deve aparecer visualmente ou funcionalmente
+    const hideWaitlist = isResenha;
+
     useEffect(() => {
         const updateTimer = () => {
             const now = Date.now();
@@ -146,11 +167,11 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         return () => clearInterval(interval);
     }, [session.guestWindowOpenTime]);
 
-    const handleJoin = async () => {
+    const handleJoin = async (asSpectator = false) => {
         if (!joinTime) return alert("Informe seu horário.");
         setLoading(true);
         try {
-            await db.joinSession(session.id, currentUser, joinTime);
+            await db.joinSession(session.id, currentUser, joinTime, false, undefined, asSpectator);
             onRefresh();
             setLoading(false);
             setJoinSuccess(true);
@@ -220,7 +241,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         setLoading(true);
         try {
             await db.closeSession(session.id);
-            onClose(); // Close modal, user will see update in list
+            onClose(); 
             onRefresh();
         } catch(e: any) {
             alert(e.message);
@@ -239,7 +260,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         const isEditing = editingTimeId === p.userId;
         const displayName = p.isGuest ? p.name : (allUsers.find(u => u.uid === p.userId)?.nickname || p.name);
         
-        // Em histórico (sessão fechada): opacidade se não foi
         const isAbsent = isClosed && !p.attended;
         const rowOpacity = isAbsent ? 'opacity-50 grayscale' : 'opacity-100';
 
@@ -321,6 +341,16 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     <span>Início: {session.time}</span>
                                 </div>
                             </div>
+                            <div className="flex gap-2 mt-2">
+                                 <span className="text-[10px] font-bold uppercase bg-black/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                    {getSessionTypeIcon(session.type)} {getSessionTypeLabel(session.type)}
+                                 </span>
+                                 {session.genderRestriction !== 'all' && (
+                                     <span className="text-[10px] font-bold uppercase bg-black/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                         {session.genderRestriction === 'M' ? 'Masculino' : 'Feminino'}
+                                     </span>
+                                 )}
+                            </div>
                         </div>
                     ) : (
                         <div className="pr-12 space-y-2">
@@ -332,23 +362,6 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
                                 <input type="time" value={editData.time} onChange={e => setEditData({...editData, time: e.target.value})} 
                                     className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
-                             </div>
-
-                             <div className="grid grid-cols-2 gap-2">
-                                 <div>
-                                    <label className="text-[10px] uppercase font-bold text-slate-800">Convidados</label>
-                                    <div className="flex gap-1">
-                                        <input type="date" value={editData.guestDate} onChange={e => setEditData({...editData, guestDate: e.target.value})} 
-                                            className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
-                                        <input type="time" value={editData.guestTime} onChange={e => setEditData({...editData, guestTime: e.target.value})} 
-                                            className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
-                                    </div>
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] uppercase font-bold text-slate-800">Vagas</label>
-                                     <input type="number" value={editData.maxSpots} onChange={e => setEditData({...editData, maxSpots: Number(e.target.value)})} 
-                                        className="w-full p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
-                                 </div>
                              </div>
 
                              <div className="flex gap-2 mt-2">
@@ -371,7 +384,7 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         </span>
                     </div>
 
-                    {!isClosed && (
+                    {!isClosed && session.allowGuests && (
                         <div className="flex items-center gap-1.5">
                             {timeToGuests ? (
                                 <>
@@ -389,13 +402,18 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                             )}
                         </div>
                     )}
+                    {!isClosed && !session.allowGuests && (
+                        <div className="flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded text-[10px] font-bold text-red-700 dark:text-red-400 uppercase">
+                            <UserX size={12} />
+                            Sem Convidados
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar bg-white dark:bg-slate-800 p-4 transition-colors">
                     
                     {!isClosed && (
                         <div className="mb-6 transition-all duration-300">
-                            {/* Botão de Finalizar Partida (Admin/Dev) quando o jogo já começou */}
                             {isAdmin && isStarted && (
                                 <div className="mb-4">
                                      <button onClick={handleCloseSession} disabled={loading} className="w-full bg-slate-900 hover:bg-black text-white p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg dark:bg-slate-700 dark:hover:bg-slate-600">
@@ -415,27 +433,59 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                 </div>
                             ) : (
                                 !isPlayerIn && !isWaitlisted ? (
-                                    <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-100 dark:border-yellow-900/20">
-                                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Vai jogar? Confirme agora!</h3>
-                                        <div className="flex gap-2 items-end">
-                                            <div className="flex-1">
-                                                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase block mb-1">Chegada Prevista</label>
-                                                <TimePicker value={joinTime} onChange={setJoinTime} />
+                                    <>
+                                        {!genderAllowed ? (
+                                            <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20 text-center">
+                                                <AlertCircle size={32} className="mx-auto text-red-400 mb-2"/>
+                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Restrição de Gênero</h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                    Esta lista é exclusiva para o público {session.genderRestriction === 'M' ? 'Masculino' : 'Feminino'}.
+                                                </p>
                                             </div>
-                                            <button onClick={handleJoin} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
-                                                {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Lista de Espera' : 'CONFIRMAR')}
-                                            </button>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1">
-                                            <AlertCircle size={10}/> Atraso  30min = Lista de espera automática.
-                                        </p>
-                                    </div>
+                                        ) : (
+                                            <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-100 dark:border-yellow-900/20">
+                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Vai jogar? Confirme agora!</h3>
+                                                <div className="flex gap-2 items-end">
+                                                    <div className="flex-1">
+                                                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase block mb-1">Chegada Prevista</label>
+                                                        <TimePicker value={joinTime} onChange={setJoinTime} />
+                                                    </div>
+                                                    
+                                                    {isChampionship ? (
+                                                        <>
+                                                            <button onClick={() => handleJoin(false)} disabled={loading || isFull} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                                                {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Lotado' : 'JOGAR')}
+                                                            </button>
+                                                            <button onClick={() => handleJoin(true)} disabled={loading} className="flex-1 bg-orange-400 hover:bg-orange-500 text-white font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
+                                                                {loading ? <Loader2 className="animate-spin" size={16}/> : <><Megaphone size={14}/> TORCER</>}
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button onClick={() => handleJoin(false)} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold py-2 h-[38px] rounded-lg text-sm flex items-center justify-center gap-2 shadow-sm">
+                                                            {loading ? <Loader2 className="animate-spin" size={16}/> : (isFull ? 'Entrar na Lista de Espera' : 'CONFIRMAR')}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                
+                                                {!isChampionship && !isResenha && (
+                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1">
+                                                        <AlertCircle size={10}/> Atraso  30min = Lista de espera automática.
+                                                    </p>
+                                                )}
+                                                {isChampionship && (
+                                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 flex items-center gap-1">
+                                                        <Info size={10}/> "Jogar" entra na lista principal. "Torcer" entra na Torcida.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="grid grid-cols-2 gap-3">
                                         <button onClick={handleLeave} disabled={loading} className="bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/30 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
                                             {loading ? <Loader2 className="animate-spin" size={16}/> : <><UserMinus size={16}/> Sair da Lista</>}
                                         </button>
-                                        {!hasGuest && (
+                                        {!hasGuest && session.allowGuests && !isChampionship && (
                                             <button onClick={() => setShowGuestForm(!showGuestForm)} disabled={!guestWindowOpen || loading} 
                                                 className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-colors
                                                 ${showGuestForm ? 'bg-slate-800 text-white border-slate-800' : 
@@ -483,10 +533,10 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                         </div>
                     </div>
 
-                    {session.waitlist.length > 0 && (
+                    {!hideWaitlist && session.waitlist.length > 0 && (
                         <div className="mt-6">
                             <h3 className="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                Lista de Espera ({session.waitlist.length})
+                                {isChampionship ? "Torcida" : "Lista de Espera"} ({session.waitlist.length})
                             </h3>
                              <div className="bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-100 dark:border-orange-900/20 overflow-hidden">
                                 {session.waitlist.map((p, i) => renderListRow(p, i, true))}
@@ -550,6 +600,18 @@ const SessionSummaryCard: React.FC<SessionSummaryCardProps> = ({ session, onClic
                 <h3 className="font-bold text-slate-800 dark:text-white text-lg leading-tight mb-1 group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">
                     {session.name}
                 </h3>
+
+                {/* Tags Info */}
+                <div className="flex gap-2 mt-2">
+                    <span className="text-[9px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded flex items-center gap-1 uppercase font-bold">
+                        {getSessionTypeIcon(session.type)} {getSessionTypeLabel(session.type)}
+                    </span>
+                    {session.genderRestriction !== 'all' && (
+                         <span className="text-[9px] bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-1.5 py-0.5 rounded flex items-center gap-1 uppercase font-bold">
+                             {session.genderRestriction === 'M' ? 'Masc' : 'Fem'}
+                         </span>
+                    )}
+                </div>
                 
                 <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 text-xs font-medium mt-3">
                     <div className="flex items-center gap-1.5">

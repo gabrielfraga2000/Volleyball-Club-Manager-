@@ -12,64 +12,14 @@ const parseDate = (dateStr: string) => {
     return new Date(y, m - 1, d, 12, 0, 0);
 };
 
-const TimePicker = ({ value, onChange, className = "" }: { value: string, onChange: (v: string) => void, className?: string }) => {
-    const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
-    const minutes = ['00', '10', '20', '30', '40', '50'];
-    const [h, m] = (value && value.includes(':')) ? value.split(':') : ['', ''];
-
-    const update = (newH: string, newM: string) => {
-        onChange(`${newH}:${newM}`);
-    };
-
-    const baseSelectClass = "appearance-none w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded p-2 text-sm text-slate-700 dark:text-white outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-200 dark:focus:ring-yellow-500/30 transition-colors";
-
-    return (
-        <div className={`flex items-center gap-1 ${className}`}>
-            <div className="relative flex-1">
-                <select 
-                    value={h} 
-                    onChange={e => update(e.target.value, m || '00')}
-                    className={baseSelectClass}
-                    required
-                >
-                    {!h && <option value="" disabled>Hr</option>}
-                    {hours.map(hh => <option key={hh} value={hh}>{hh}</option>)}
-                </select>
-            </div>
-            <span className="text-slate-400 font-bold">:</span>
-            <div className="relative flex-1">
-                <select 
-                    value={m} 
-                    onChange={e => update(h || '00', e.target.value)}
-                    className={baseSelectClass}
-                    required
-                >
-                    {!m && <option value="" disabled>Min</option>}
-                    {minutes.map(mm => <option key={mm} value={mm}>{mm}</option>)}
-                </select>
-            </div>
-        </div>
-    );
-};
-
 export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const [users, setUsers] = useState<User[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [allSessions, setAllSessions] = useState<GameSession[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'create' | 'logs' | 'guests' | 'matches' | 'pending'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'logs' | 'guests' | 'matches' | 'pending'>('users');
   
   const [inspectUser, setInspectUser] = useState<User | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
-
-  const [newList, setNewList] = useState({ 
-    name: '', 
-    date: '', 
-    time: '', 
-    maxSpots: 18, 
-    guestDate: '',
-    guestTime: ''
-  });
-  const [msg, setMsg] = useState("");
 
   const isDev = currentUser.role === 3;
   const isAdminOrDev = currentUser.role === 2 || currentUser.role === 3;
@@ -88,45 +38,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
         if (updated) setInspectUser(updated);
     }
   }
-
-  const handleCreateList = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (newList.maxSpots < 6) {
-      alert("O número mínimo de vagas para criar uma lista é 6.");
-      return;
-    }
-
-    if (newList.maxSpots > 30) {
-      alert("O limite máximo de jogadores por lista é 30.");
-      return;
-    }
-    
-    if (!newList.time || !newList.guestTime) {
-        alert("Preencha todos os horários.");
-        return;
-    }
-    
-    const guestWindowOpenTime = new Date(`${newList.guestDate}T${newList.guestTime}`).getTime();
-    
-    if (isNaN(guestWindowOpenTime)) {
-        alert("Por favor, preencha a data e hora de abertura para convidados corretamente.");
-        return;
-    }
-
-    await db.createSession({
-      name: newList.name,
-      date: newList.date,
-      time: newList.time,
-      maxSpots: newList.maxSpots,
-      guestWindowOpenTime,
-      createdBy: currentUser.uid
-    });
-    setMsg("Lista Criada com Sucesso!");
-    setNewList({ name: '', date: '', time: '', maxSpots: 18, guestDate: '', guestTime: '' });
-    refreshData();
-    setTimeout(() => setMsg(""), 3000);
-  };
 
   const toggleRole = async (uid: string, currentRole: number) => {
     if (!isDev && currentRole >= 2) return; 
@@ -232,13 +143,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
         <button 
-          onClick={() => setActiveSubTab('create')}
-          className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'create' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
-        >
-          Criar Lista
-        </button>
-        
-        <button 
            onClick={() => setActiveSubTab('users')}
            className={`px-3 py-1 text-xs font-bold rounded-full ${activeSubTab === 'users' ? 'bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900' : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700'}`}
         >
@@ -277,47 +181,6 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
             </button>
         )}
       </div>
-      
-      {activeSubTab === 'create' && (
-        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 animate-fade-in transition-colors">
-          <h3 className="font-bold text-slate-900 dark:text-white mb-4">Nova Lista</h3>
-          <form onSubmit={handleCreateList} className="space-y-3">
-            <input required placeholder="Local (ex: Ginásio Municipal)" 
-              className="w-full p-2 rounded text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400" 
-              value={newList.name} onChange={e => setNewList({...newList, name: e.target.value})} />
-            
-            <div className="bg-white dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Horário do Jogo</p>
-                <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-white w-full" 
-                        value={newList.date} onChange={e => setNewList({...newList, date: e.target.value})} />
-                    
-                    <TimePicker value={newList.time} onChange={v => setNewList({...newList, time: v})} />
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-700 p-2 rounded border border-slate-200 dark:border-slate-600">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Liberação para Convidados</p>
-                <div className="grid grid-cols-2 gap-2">
-                    <input required type="date" className="p-2 rounded text-sm bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 text-slate-900 dark:text-white w-full" 
-                        value={newList.guestDate} onChange={e => setNewList({...newList, guestDate: e.target.value})} />
-                    
-                    <TimePicker value={newList.guestTime} onChange={v => setNewList({...newList, guestTime: v})} />
-                </div>
-            </div>
-
-            <div>
-                <label className="text-xs text-slate-700 dark:text-slate-400 font-bold">Vagas (Máx. 30 - Min. 6)</label>
-                <input type="number" min="6" max="30" 
-                    className="w-full p-2 rounded text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white" 
-                    value={newList.maxSpots} onChange={e => setNewList({...newList, maxSpots: parseInt(e.target.value)})} />
-            </div>
-
-            <button className="w-full bg-slate-900 dark:bg-yellow-400 text-yellow-400 dark:text-slate-900 py-2 rounded font-bold hover:bg-slate-800 dark:hover:bg-yellow-300">Criar Sessão</button>
-            {msg && <p className="text-green-600 text-xs text-center">{msg}</p>}
-          </form>
-        </div>
-      )}
 
       {activeSubTab === 'matches' && isAdminOrDev && (
         <div className="space-y-4 animate-fade-in">
@@ -333,7 +196,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                         className="p-3 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                         <div>
-                            <div className="font-bold text-slate-800 dark:text-white text-sm">{session.name}</div>
+                            <div className="font-bold text-slate-800 dark:text-white text-sm">{session.name} <span className="text-[10px] text-slate-400 font-normal ml-1 border border-slate-300 dark:border-slate-600 rounded px-1">{session.type}</span></div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">
                                 {parseDate(session.date).toLocaleDateString()} @ {session.time} • {session.players.length} Jogadores
                             </div>
@@ -370,7 +233,7 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                             
                             {session.waitlist.length > 0 && (
                                 <div className="mt-4 space-y-1">
-                                     <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Lista de Espera</p>
+                                     <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Lista de Espera / Torcida</p>
                                      {session.waitlist.map(p => (
                                         <div key={p.userId} className="flex justify-between items-center py-1">
                                             <span className="text-sm text-orange-800/60 dark:text-orange-300/60">{p.name}</span>

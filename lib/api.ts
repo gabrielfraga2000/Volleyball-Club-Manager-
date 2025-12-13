@@ -170,6 +170,49 @@ export const db = {
   },
 
   async updateProfile(uid: string, data: Partial<User>) {
+    // Lógica Específica para Troca de Nick
+    if (data.nickname) {
+        const currentUser = localUsersCache.find(u => u.uid === uid);
+        if (!currentUser) throw new Error("Usuário não encontrado");
+
+        const newNick = data.nickname.trim();
+        const oldNick = currentUser.nickname;
+
+        if (newNick.length > 16) {
+             throw new Error("O nick deve ter no máximo 16 caracteres.");
+        }
+
+        if (newNick !== oldNick) {
+            // 1. Verificar Unicidade
+            const nickExists = localUsersCache.some(u => 
+                u.uid !== uid && 
+                u.nickname?.toLowerCase() === newNick.toLowerCase()
+            );
+
+            if (nickExists) {
+                throw new Error("Este nick já está em uso por outro jogador.");
+            }
+
+            // 2. Verificar Rate Limit (2x free, depois 1x por semana)
+            const count = currentUser.nicknameChangeCount || 0;
+            const lastUpdate = currentUser.nicknameLastUpdated || 0;
+            const now = Date.now();
+            const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+
+            if (count >= 2) {
+                if (now - lastUpdate < oneWeekMs) {
+                    const daysLeft = Math.ceil((oneWeekMs - (now - lastUpdate)) / (24 * 60 * 60 * 1000));
+                    throw new Error(`Você já alterou seu nick muitas vezes. Próxima alteração permitida em ${daysLeft} dias.`);
+                }
+            }
+
+            // Atualiza contadores
+            data.nickname = newNick;
+            data.nicknameChangeCount = count + 1;
+            data.nicknameLastUpdated = now;
+        }
+    }
+
     const userRef = doc(firestore, "users", uid);
     await updateDoc(userRef, data);
 
@@ -222,6 +265,36 @@ export const db = {
   getSessions(): GameSession[] {
     return localSessionsCache;
   },
+  
+  // Função para verificar sessões expiradas (> 4 horas)
+  async checkAndCloseExpiredSessions() {
+      const now = Date.now();
+      const fourHoursMs = 4 * 60 * 60 * 1000;
+      
+      const sessionsToClose = localSessionsCache.filter(s => {
+          if (s.status === 'closed') return false;
+          const sessionStart = new Date(`${s.date}T${s.time}`).getTime();
+          // Se já passou 4 horas do início
+          return (now - sessionStart) > fourHoursMs;
+      });
+
+      if (sessionsToClose.length === 0) return;
+
+      // Busca Admins e Devs para notificar
+      const admins = localUsersCache.filter(u => u.role === 2 || u.role === 3);
+
+      for (const session of sessionsToClose) {
+          await this.closeSession(session.id);
+          
+          const msg = `⚠️ O jogo '${session.name}' foi encerrado automaticamente (4h+). Por favor, atualize a lista de presença.`;
+          
+          for (const admin of admins) {
+              await this.addNotification(admin.uid, msg);
+          }
+          
+          await this.addLog("AUTO_CLOSE", `Sessão ${session.name} encerrada automaticamente por tempo excedido. Admins notificados.`, "Sistema");
+      }
+  },
 
   async createSession(sessionData: Omit<GameSession, 'id' | 'players' | 'waitlist' | 'status'>) {
     // Cria ID manualmente ou deixa o Firestore criar.
@@ -237,7 +310,7 @@ export const db = {
     };
     
     await setDoc(newSessionRef, newSession);
-    await this.addLog("CREATE_SESSION", `Sessão criada: ${newSession.name} para ${newSession.date}`);
+    await this.addLog("CREATE_SESSION", `Sessão criada: ${newSession.name} (${newSession.type}) para ${newSession.date}`);
   },
   
   async updateSession(sessionId: string, data: Partial<GameSession>) {
@@ -252,14 +325,59 @@ export const db = {
       await this.addLog("CLOSE_SESSION", `Sessão ${sessionId} finalizada.`);
   },
 
-  async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any) {
+  // Adicionado parâmetro asSpectator para logica de campeonato
+  async joinSession(sessionId: string, user: User, arrivalTime: string, isGuest = false, guestData?: any, asSpectator = false) {
     const sessionRef = doc(firestore, "sessions", sessionId);
     const sessionDoc = await getDoc(sessionRef);
     
     if (!sessionDoc.exists()) throw new Error("Sessão não encontrada.");
     const session = sessionDoc.data() as GameSession;
 
-    // Validation Logic (Same as before)
+    // --- New Constraints ---
+    
+    // 1. Gender Restriction
+    if (!isGuest) { // Convidados assumimos que o anfitrião verificou, ou bloqueia tudo se quiser rigor
+        if (session.genderRestriction !== 'all') {
+            // 'M' permite 'M' e 'O'. 'F' permite 'F' e 'O'.
+            const allowed = user.gender === session.genderRestriction || user.gender === 'O';
+            if (!allowed) {
+                const mapGender = { 'M': 'Masculino', 'F': 'Feminino' };
+                throw new Error(`Esta lista é restrita ao público ${mapGender[session.genderRestriction]}.`);
+            }
+        }
+    }
+
+    // 2. Guest Restriction
+    if (isGuest) {
+        if (!session.allowGuests) throw new Error("Esta lista não permite convidados.");
+        if (session.type === 'campeonato') throw new Error("Campeonatos não permitem convidados.");
+    }
+    
+    // 3. Time Constraints Logic (Existing)
+    const now = Date.now();
+    const sessionStart = new Date(`${session.date}T${session.time}`).getTime();
+    
+    const twentyMinMs = 20 * 60 * 1000;
+    if (now < (sessionStart - twentyMinMs)) {
+        throw new Error("A lista só abre 20 minutos antes do horário do jogo.");
+    }
+
+    const startH = parseInt(session.time.split(':')[0]);
+    const arrivalH = parseInt(arrivalTime.split(':')[0]);
+    
+    let arrivalDate = new Date(`${session.date}T${arrivalTime}`);
+    if (arrivalH < startH && (startH - arrivalH) > 12) {
+        arrivalDate.setDate(arrivalDate.getDate() + 1);
+    }
+    
+    const timeDiff = arrivalDate.getTime() - sessionStart;
+    const fourHoursMs = 4 * 60 * 60 * 1000;
+
+    if (timeDiff > fourHoursMs) {
+        throw new Error("Não é permitido entrar na lista para chegar mais de 4 horas após o início.");
+    }
+
+    // Validation Logic
     const userIdToCheck = isGuest ? `guest-${Date.now()}` : user.uid;
     if (!isGuest) {
         if (session.players.some(p => p.userId === user.uid) || session.waitlist.some(p => p.userId === user.uid)) {
@@ -269,40 +387,49 @@ export const db = {
 
     const startMinutes = getMinutes(session.time);
     const arrivalMinutes = getMinutes(arrivalTime);
-    const isLate = arrivalMinutes > (startMinutes + 30);
+    
+    // Lógica de atraso: Só se aplica se NÃO for campeonato e NÃO for resenha
+    let isLate = false;
+    if (session.type !== 'campeonato' && session.type !== 'resenha') {
+        isLate = arrivalMinutes > (startMinutes + 30);
+    }
+    
     const isFull = session.players.length >= session.maxSpots;
 
-    // CORREÇÃO CRÍTICA: Firestore não aceita 'undefined'. Usamos 'null' explicitamente.
-    // Usamos 'any' temporariamente aqui se a interface ListPlayer for estrita, mas o Firestore exige null.
     const listPlayer: any = {
         userId: userIdToCheck,
         name: isGuest ? (guestData?.name + ' ' + (guestData?.surname || '')) : (user.nickname || user.fullName),
         isGuest,
-        linkedTo: isGuest ? user.uid : null, // MUDANÇA: undefined -> null
+        linkedTo: isGuest ? user.uid : null, 
         joinedAt: Date.now(),
         arrivalEstimate: arrivalTime,
-        guestContact: isGuest ? guestData : null // MUDANÇA: undefined -> null
+        guestContact: isGuest ? guestData : null 
     };
 
     const updates: any = {};
 
-    if (isFull || isLate) {
-        updates.waitlist = [...session.waitlist, listPlayer];
+    // Campeonato Spectator Logic:
+    // Se for espectador, vai direto pra waitlist (Torcida).
+    // Se for campeonato mas 'player', tenta entrar na main list. Se cheio, vai pra waitlist.
+    if (session.type === 'campeonato' && asSpectator) {
+         updates.waitlist = [...session.waitlist, listPlayer];
     } else {
-        updates.players = [...session.players, listPlayer];
-        
-        // Progress Notifications (Simplified for API)
-        const count = session.players.length + 1;
-        if (count === session.maxSpots) {
-             // Example: notify logic could be here
+         if (isFull || isLate) {
+            updates.waitlist = [...session.waitlist, listPlayer];
+        } else {
+            updates.players = [...session.players, listPlayer];
         }
     }
 
     await updateDoc(sessionRef, updates);
     
-    const logDetails = isGuest 
-        ? `Convidado ${listPlayer.name} adicionado por ${user.fullName} em ${session.name}`
-        : `${user.fullName} entrou em ${session.name} (Chegada: ${arrivalTime})`;
+    let logDetails = "";
+    if (isGuest) {
+        logDetails = `Convidado ${listPlayer.name} adicionado por ${user.fullName} em ${session.name}`;
+    } else {
+        const roleStr = (session.type === 'campeonato' && asSpectator) ? " (Torcida)" : "";
+        logDetails = `${user.fullName} entrou em ${session.name}${roleStr} (Chegada: ${arrivalTime})`;
+    }
     
     await this.addLog("JOIN", logDetails, user.fullName);
   },
@@ -327,17 +454,21 @@ export const db = {
 
     // 3. Promotion Logic
     const startMinutes = getMinutes(session.time);
-    while (session.players.length < session.maxSpots && session.waitlist.length > 0) {
-        const candidateIndex = session.waitlist.findIndex(p => {
-            const arrMinutes = getMinutes(p.arrivalEstimate);
-            return arrMinutes <= (startMinutes + 30);
-        });
-        
-        if (candidateIndex === -1) break; 
-        const [candidate] = session.waitlist.splice(candidateIndex, 1);
-        if (candidate) {
-            session.players.push(candidate);
-            // Notify candidate logic here...
+    
+    // Só promove automaticamente se NÃO for campeonato (pois lista de espera lá é torcida)
+    // E NÃO for resenha (que não tem espera lógica)
+    if (session.type !== 'campeonato' && session.type !== 'resenha') {
+        while (session.players.length < session.maxSpots && session.waitlist.length > 0) {
+            const candidateIndex = session.waitlist.findIndex(p => {
+                const arrMinutes = getMinutes(p.arrivalEstimate);
+                return arrMinutes <= (startMinutes + 30);
+            });
+            
+            if (candidateIndex === -1) break; 
+            const [candidate] = session.waitlist.splice(candidateIndex, 1);
+            if (candidate) {
+                session.players.push(candidate);
+            }
         }
     }
 
@@ -373,52 +504,52 @@ export const db = {
 
     const startMinutes = getMinutes(session.time);
 
+    // Se for Campeonato ou Resenha, APENAS atualiza o horário, não move ninguem.
+    if (session.type === 'campeonato' || session.type === 'resenha') {
+        if (playerIndex !== -1) newPlayers[playerIndex].arrivalEstimate = newTime;
+        if (waitlistIndex !== -1) newWaitlist[waitlistIndex].arrivalEstimate = newTime;
+        await updateDoc(sessionRef, { players: newPlayers, waitlist: newWaitlist });
+        return;
+    }
+
+    // Logica padrão para Pelada/Treino (Late -> Waitlist)
     if (playerIndex !== -1) {
-        // Está na lista principal
         const player = newPlayers[playerIndex];
         player.arrivalEstimate = newTime;
 
-        // Verifica se ficou atrasado
         const arrivalMinutes = getMinutes(newTime);
         const isLate = arrivalMinutes > (startMinutes + 30);
 
         if (isLate) {
-            // Remove da lista principal e joga pra lista de espera
             newPlayers.splice(playerIndex, 1);
             newWaitlist.push(player);
             
-            // Tenta promover alguém da lista de espera para a vaga que abriu
             while (newPlayers.length < session.maxSpots && newWaitlist.length > 0) {
-                // Encontra alguém que NÃO esteja atrasado
                 const candidateIndex = newWaitlist.findIndex(p => {
                     const arrM = getMinutes(p.arrivalEstimate);
                     return arrM <= (startMinutes + 30);
                 });
                 
-                if (candidateIndex === -1) break; // Só tem gente atrasada na espera
+                if (candidateIndex === -1) break;
 
                 const [candidate] = newWaitlist.splice(candidateIndex, 1);
                 newPlayers.push(candidate);
             }
-            
-            await this.addLog("AUTO_WAITLIST", `Jogador ${player.name} movido para lista de espera por alterar horário para ${newTime} (atraso > 30m).`, "Sistema");
+            await this.addLog("AUTO_WAITLIST", `Jogador ${player.name} movido para espera (atraso > 30m).`, "Sistema");
         } 
     
     } else if (waitlistIndex !== -1) {
-        // Está na lista de espera
         const player = newWaitlist[waitlistIndex];
         player.arrivalEstimate = newTime;
 
-        // VERIFICA SE PODE SUBIR PARA PRINCIPAL
         const arrivalMinutes = getMinutes(newTime);
         const isLate = arrivalMinutes > (startMinutes + 30);
         const hasSpot = newPlayers.length < session.maxSpots;
 
         if (!isLate && hasSpot) {
-            // Promove!
             newWaitlist.splice(waitlistIndex, 1);
             newPlayers.push(player);
-            await this.addLog("PROMOTION", `Jogador ${player.name} subiu da lista de espera (horário ajustado).`, "Sistema");
+            await this.addLog("PROMOTION", `Jogador ${player.name} subiu da lista de espera.`, "Sistema");
         }
     }
 

@@ -4,7 +4,8 @@ import { db } from '../lib/api'; // Mudança aqui
 import GameLists from './GameLists';
 import AdminPanel from './AdminPanel';
 import Notifications from './Notifications';
-import { User as UserIcon, Calendar, Bell, LogOut, Shield, RefreshCw, Save, Sun } from 'lucide-react';
+import CreateSession from './CreateSession';
+import { User as UserIcon, Calendar, Bell, LogOut, Shield, RefreshCw, Save, Sun, AlertTriangle, PlusCircle } from 'lucide-react';
 
 interface DashboardProps {
   user: User;
@@ -12,7 +13,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user: initialUser, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'lists' | 'notifications'>('lists');
+  const [activeTab, setActiveTab] = useState<'profile' | 'lists' | 'create' | 'notifications'>('lists');
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   
@@ -20,6 +21,7 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
   
   const [nickname, setNickname] = useState(liveUser.nickname || liveUser.fullName);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
   const [imgError, setImgError] = useState(false);
 
   const isAdminOrDev = liveUser.role === 2 || liveUser.role === 3;
@@ -29,7 +31,13 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
     // Agora usando o cache sincronizado do Firestore
     setSessions(db.getSessions());
     setAllUsers(db.getUsers());
-  }, []);
+    
+    // Trigger Auto-Close Logic (Client-side simulation of backend cron)
+    // Só admins executam essa verificação para evitar conflitos de escrita múltiplos
+    if (isAdminOrDev) {
+        db.checkAndCloseExpiredSessions();
+    }
+  }, [isAdminOrDev]);
 
   useEffect(() => {
     loadData();
@@ -39,10 +47,13 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
 
   const handleUpdateProfile = async () => {
     setSavingProfile(true);
+    setProfileError("");
     try {
         await db.updateProfile(liveUser.uid, { nickname });
+        // Sucesso visual
+        alert("Perfil atualizado com sucesso!");
     } catch (e: any) {
-        alert("Erro ao salvar perfil");
+        setProfileError(e.message);
     } finally {
         setSavingProfile(false);
     }
@@ -104,7 +115,7 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
               </div>
               
               <div className="w-full mb-4">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Nome de Exibição (Lista)</label>
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Nick (Nome na Lista)</label>
                 <div className="flex gap-2">
                     <input 
                         type="text" 
@@ -121,8 +132,13 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
                         <Save size={18} />
                     </button>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <p className="text-[10px] text-slate-400">Como aparecerá na lista.</p>
+                {profileError && (
+                    <div className="text-[10px] text-red-500 mt-2 flex items-start gap-1 leading-tight">
+                        <AlertTriangle size={12} className="shrink-0 mt-0.5"/> {profileError}
+                    </div>
+                )}
+                <div className="flex justify-between mt-2">
+                  <p className="text-[10px] text-slate-400">Trocas permitidas: 2 iniciais, depois 1/semana.</p>
                   <p className="text-[10px] text-slate-400">{nickname.length}/16</p>
                 </div>
               </div>
@@ -152,6 +168,10 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
           </div>
         )}
 
+        {activeTab === 'create' && (
+           <CreateSession currentUser={liveUser} onSuccess={() => setActiveTab('lists')} />
+        )}
+
         {activeTab === 'notifications' && (
           <div className="p-4 h-full">
              <Notifications user={liveUser} />
@@ -167,6 +187,13 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
         >
           <Calendar size={24} />
           <span className="text-[10px] font-bold mt-1">Jogos</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('create')}
+          className={`flex flex-col items-center p-2 rounded-xl flex-1 transition-colors ${activeTab === 'create' ? 'text-yellow-600 dark:text-yellow-400' : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'}`}
+        >
+          <PlusCircle size={24} />
+          <span className="text-[10px] font-bold mt-1">Criar</span>
         </button>
         <button 
           onClick={() => setActiveTab('profile')}

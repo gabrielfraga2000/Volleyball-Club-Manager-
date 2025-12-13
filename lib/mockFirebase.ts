@@ -42,7 +42,10 @@ const INITIAL_SESSIONS: GameSession[] = [
         players: [],
         waitlist: [],
         createdBy: 'system',
-        status: 'open'
+        status: 'open',
+        type: 'pelada',
+        genderRestriction: 'all',
+        allowGuests: true
     }
 ];
 
