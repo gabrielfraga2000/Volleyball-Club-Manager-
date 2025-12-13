@@ -337,7 +337,10 @@ export const db = {
     
     // 1. Gender Restriction
     if (!isGuest) { // Convidados assumimos que o anfitrião verificou, ou bloqueia tudo se quiser rigor
-        if (session.genderRestriction !== 'all') {
+        // Se for campeonato E o usuário estiver entrando como espectador (torcida), PULA a verificação
+        const skipGenderCheck = session.type === 'campeonato' && asSpectator;
+
+        if (!skipGenderCheck && session.genderRestriction !== 'all') {
             // 'M' permite 'M' e 'O'. 'F' permite 'F' e 'O'.
             const allowed = user.gender === session.genderRestriction || user.gender === 'O';
             if (!allowed) {

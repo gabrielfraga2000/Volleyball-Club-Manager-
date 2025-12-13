@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../lib/api';
 import { User, SessionType, GenderRestriction } from '../types';
 import { PlusCircle, Lock, Calendar, Clock, Users, ShieldAlert, CheckCircle, Info } from 'lucide-react';
@@ -65,6 +65,13 @@ export default function CreateSession({ currentUser, onSuccess }: CreateSessionP
     const [msg, setMsg] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Effect to enforce constraints when type changes
+    useEffect(() => {
+        if (formData.type === 'campeonato') {
+            setFormData(prev => ({ ...prev, allowGuests: false }));
+        }
+    }, [formData.type]);
+
     if (!isAdminOrDev) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900 transition-colors">
@@ -90,21 +97,29 @@ export default function CreateSession({ currentUser, onSuccess }: CreateSessionP
             return;
         }
 
-        if (!formData.time || !formData.guestTime) {
-             alert("Preencha todos os horários.");
+        if (!formData.time) {
+             alert("Preencha o horário do jogo.");
              setLoading(false);
              return;
         }
 
-        // Campeonato restriction enforcement
-        let finalAllowGuests = formData.allowGuests;
-        if (formData.type === 'campeonato') {
-            finalAllowGuests = false; // Force no guests for championships
+        // Only validate guest time if guests are allowed
+        if (formData.allowGuests && (!formData.guestDate || !formData.guestTime)) {
+             alert("Preencha a data e hora de abertura para convidados.");
+             setLoading(false);
+             return;
         }
 
         try {
-            const guestWindowOpenTime = new Date(`${formData.guestDate}T${formData.guestTime}`).getTime();
-            if (isNaN(guestWindowOpenTime)) throw new Error("Data de convidados inválida.");
+            let guestWindowOpenTime = 0;
+            
+            if (formData.allowGuests) {
+                guestWindowOpenTime = new Date(`${formData.guestDate}T${formData.guestTime}`).getTime();
+                if (isNaN(guestWindowOpenTime)) throw new Error("Data de convidados inválida.");
+            } else {
+                // Se não tem convidado, define como agora (ou passado) apenas para constar
+                guestWindowOpenTime = Date.now(); 
+            }
 
             await db.createSession({
                 name: formData.name,
@@ -115,7 +130,7 @@ export default function CreateSession({ currentUser, onSuccess }: CreateSessionP
                 createdBy: currentUser.uid,
                 type: formData.type,
                 genderRestriction: formData.genderRestriction,
-                allowGuests: finalAllowGuests
+                allowGuests: formData.allowGuests
             });
 
             setMsg("Lista Criada com Sucesso!");
@@ -250,30 +265,32 @@ export default function CreateSession({ currentUser, onSuccess }: CreateSessionP
                     </div>
                 </div>
 
-                {/* Guest Window */}
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
-                        <Clock size={14}/> Abertura para Convidados
-                    </h3>
-                    <p className="text-xs text-slate-400 mb-3">Defina quando a lista de convidados será liberada.</p>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                             <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Data Abertura</label>
-                             <input 
-                                required 
-                                type="date" 
-                                className="w-full p-3 rounded-lg text-sm border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none" 
-                                value={formData.guestDate} 
-                                onChange={e => setFormData({...formData, guestDate: e.target.value})} 
-                            />
-                        </div>
-                         <div>
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Hora Abertura</label>
-                            <TimePicker value={formData.guestTime} onChange={v => setFormData({...formData, guestTime: v})} />
+                {/* Guest Window - Only Show if Guests Allowed */}
+                {formData.allowGuests && (
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors animate-fade-in">
+                        <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
+                            <Clock size={14}/> Abertura para Convidados
+                        </h3>
+                        <p className="text-xs text-slate-400 mb-3">Defina quando a lista de convidados será liberada.</p>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Data Abertura</label>
+                                <input 
+                                    required={formData.allowGuests}
+                                    type="date" 
+                                    className="w-full p-3 rounded-lg text-sm border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none" 
+                                    value={formData.guestDate} 
+                                    onChange={e => setFormData({...formData, guestDate: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Hora Abertura</label>
+                                <TimePicker value={formData.guestTime} onChange={v => setFormData({...formData, guestTime: v})} />
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <button 
                     disabled={loading}
