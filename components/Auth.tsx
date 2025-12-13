@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../lib/api'; // Mudança aqui
+import { db } from '../lib/api';
 import { User } from '../types';
 import { Trophy, AlertCircle, ShieldCheck, Code, User as UserIcon, Sun } from 'lucide-react';
+import mascoteImg from '../assets/mascote.png';
 
 interface AuthProps {
   onSuccess: (user: User) => void;
@@ -118,7 +119,7 @@ export default function Auth({ onSuccess }: AuthProps) {
           <div className="bg-white p-4 rounded-full shadow-lg mb-4 border-4 border-slate-900 overflow-hidden">
             {!imgError ? (
                 <img 
-                    src="/mascote.png"
+                    src={mascoteImg}
                     alt="Manhãzinha Mascote" 
                     className="w-24 h-24 object-contain" 
                     onError={() => setImgError(true)}

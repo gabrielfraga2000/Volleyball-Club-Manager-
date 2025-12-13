@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, GameSession } from '../types';
-import { db } from '../lib/api'; // Mudança aqui
+import { db } from '../lib/api';
 import GameLists from './GameLists';
 import AdminPanel from './AdminPanel';
 import Notifications from './Notifications';
 import CreateSession from './CreateSession';
 import { User as UserIcon, Calendar, Bell, LogOut, Shield, RefreshCw, Save, Sun, AlertTriangle, PlusCircle, LayoutDashboard, Trophy, TrendingUp, DollarSign } from 'lucide-react';
+import mascoteImg from '../assets/mascote.png';
 
 interface DashboardProps {
   user: User;
@@ -116,7 +117,7 @@ export default function Dashboard({ user: initialUser, onLogout }: DashboardProp
         <h1 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2 tracking-tight uppercase">
           {!imgError ? (
             <img 
-              src="/mascote.png" 
+              src={mascoteImg} 
               alt="Logo" 
               className="w-8 h-8 object-contain"
               onError={() => setImgError(true)}
