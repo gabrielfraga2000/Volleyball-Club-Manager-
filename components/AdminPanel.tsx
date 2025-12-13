@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/api'; // Mudança aqui
 import { User, SystemLog, ListPlayer, GameSession } from '../types';
-import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Download, User as UserIcon, Users as UsersIcon, Eye, ShieldAlert, X, ChevronDown, ChevronUp, Calendar, UserPlus, RefreshCw, Save } from 'lucide-react';
 
 // Função auxiliar para data local para evitar problemas de UTC
 const parseDate = (dateStr: string) => {
@@ -20,6 +20,9 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   
   const [inspectUser, setInspectUser] = useState<User | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  
+  // Estado para edição de nick no inspector
+  const [tempNick, setTempNick] = useState("");
 
   const isDev = currentUser.role === 3;
   const isAdminOrDev = currentUser.role === 2 || currentUser.role === 3;
@@ -28,11 +31,19 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
     refreshData();
   }, []);
 
+  // Atualiza o nick temporário sempre que abrir um usuário diferente
+  useEffect(() => {
+      if (inspectUser) {
+          setTempNick(inspectUser.nickname || inspectUser.fullName);
+      }
+  }, [inspectUser]);
+
   const refreshData = () => {
     setUsers(db.getUsers());
     setLogs(db.getLogs());
     setAllSessions(db.getSessions());
     
+    // Se estiver inspecionando alguém, atualiza os dados dele em tempo real
     if (inspectUser) {
         const updated = db.getUsers().find(u => u.uid === inspectUser.uid);
         if (updated) setInspectUser(updated);
@@ -56,6 +67,19 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
   const forceChangeRole = async (uid: string, newRole: number) => {
       await db.updateUserRole(uid, newRole as any);
       refreshData();
+  };
+
+  const handleUpdateNick = async () => {
+      if (!inspectUser) return;
+      try {
+          // A função updateProfile da API já contém a lógica de validação de unicidade
+          // Se o nick já existir, ela lançará um erro que capturamos abaixo
+          await db.updateProfile(inspectUser.uid, { nickname: tempNick });
+          alert("Nickname atualizado com sucesso!");
+          refreshData();
+      } catch (e: any) {
+          alert("Erro ao atualizar: " + e.message);
+      }
   };
 
   const downloadLogs = () => {
@@ -385,6 +409,23 @@ export default function AdminPanel({ currentUser }: { currentUser: User }) {
                             <h2 className="font-bold text-lg dark:text-white">{inspectUser.fullName}</h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{inspectUser.uid}</p>
                             <p className="text-sm text-slate-600 dark:text-slate-300">{inspectUser.email}</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Gerenciar Identificação (Nick)</label>
+                        <div className="flex gap-2">
+                             <input 
+                                type="text" 
+                                maxLength={16}
+                                value={tempNick}
+                                onChange={e => setTempNick(e.target.value)}
+                                placeholder="Nickname"
+                                className="flex-1 border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-600 dark:text-white rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-yellow-400"
+                             />
+                             <button onClick={handleUpdateNick} className="bg-slate-900 dark:bg-yellow-400 text-white dark:text-slate-900 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:opacity-90">
+                                 <Save size={14}/> Salvar
+                             </button>
                         </div>
                     </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GameSession, User, ListPlayer } from '../types';
+import { GameSession, User, ListPlayer, SessionType, GenderRestriction } from '../types';
 import { db } from '../lib/api'; // Mudança aqui
 import { Clock, Users, UserPlus, UserMinus, Calendar, MapPin, X, Loader2, Trash2, Edit3, Check, AlertCircle, Lock, Unlock, Save, History, PlayCircle, StopCircle, Trophy, Coffee, Dumbbell, Activity, UserX, Megaphone, Info } from 'lucide-react';
 
@@ -106,7 +106,10 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
         time: session.time,
         maxSpots: session.maxSpots,
         guestDate: '',
-        guestTime: ''
+        guestTime: '',
+        type: session.type,
+        genderRestriction: session.genderRestriction,
+        allowGuests: session.allowGuests
     });
 
     useEffect(() => {
@@ -124,7 +127,10 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                  time: session.time,
                  maxSpots: session.maxSpots,
                  guestDate: `${y}-${m}-${d}`,
-                 guestTime: `${hh}:${mm}`
+                 guestTime: `${hh}:${mm}`,
+                 type: session.type,
+                 genderRestriction: session.genderRestriction,
+                 allowGuests: session.allowGuests
              });
         }
     }, [isEditingSession, session]);
@@ -220,12 +226,19 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
             const guestWindowOpenTime = new Date(`${editData.guestDate}T${editData.guestTime}`).getTime();
             if (isNaN(guestWindowOpenTime)) throw new Error("Data de convidado inválida");
 
+            // Se mudou para campeonato, força sem convidados
+            let finalAllowGuests = editData.allowGuests;
+            if (editData.type === 'campeonato') finalAllowGuests = false;
+
             await db.updateSession(session.id, {
                 name: editData.name,
                 date: editData.date,
                 time: editData.time,
                 maxSpots: editData.maxSpots,
-                guestWindowOpenTime
+                guestWindowOpenTime,
+                type: editData.type,
+                genderRestriction: editData.genderRestriction,
+                allowGuests: finalAllowGuests
             });
             setIsEditingSession(false);
             onRefresh();
@@ -362,6 +375,60 @@ const GameSessionModal: React.FC<ModalProps> = ({ session, currentUser, onClose,
                                     className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
                                 <input type="time" value={editData.time} onChange={e => setEditData({...editData, time: e.target.value})} 
                                     className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                             </div>
+
+                             {/* Expanded Edit Fields */}
+                             <div className="grid grid-cols-2 gap-2">
+                                 <select 
+                                    value={editData.type}
+                                    onChange={e => setEditData({...editData, type: e.target.value as SessionType})}
+                                    className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900 w-full"
+                                 >
+                                    <option value="pelada">Pelada</option>
+                                    <option value="treino">Treino</option>
+                                    <option value="campeonato">Campeonato</option>
+                                    <option value="resenha">Resenha</option>
+                                 </select>
+
+                                 <select 
+                                    value={editData.genderRestriction}
+                                    onChange={e => setEditData({...editData, genderRestriction: e.target.value as GenderRestriction})}
+                                    className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900 w-full"
+                                 >
+                                    <option value="all">Misto</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="F">Feminino</option>
+                                 </select>
+                             </div>
+
+                             <div className="flex items-center gap-2">
+                                <input 
+                                    type="number" 
+                                    min="6" max="60"
+                                    value={editData.maxSpots} 
+                                    onChange={e => setEditData({...editData, maxSpots: Number(e.target.value)})}
+                                    className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900 w-16 text-center"
+                                />
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={!editData.allowGuests}
+                                        onChange={e => setEditData({...editData, allowGuests: !e.target.checked})}
+                                        disabled={editData.type === 'campeonato'}
+                                        className="w-4 h-4 rounded text-yellow-600"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-800 uppercase">Proibir Conv.</span>
+                                </label>
+                             </div>
+
+                             <div className="bg-yellow-500/20 p-2 rounded">
+                                 <p className="text-[9px] font-bold uppercase text-yellow-900 mb-1">Janela de Convidados</p>
+                                 <div className="grid grid-cols-2 gap-2">
+                                    <input type="date" value={editData.guestDate} onChange={e => setEditData({...editData, guestDate: e.target.value})} 
+                                        className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                    <input type="time" value={editData.guestTime} onChange={e => setEditData({...editData, guestTime: e.target.value})} 
+                                        className="p-1 rounded text-xs bg-yellow-100 border-none text-slate-900" />
+                                 </div>
                              </div>
 
                              <div className="flex gap-2 mt-2">
